@@ -1,0 +1,3122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐟 摸鱼计时器 — Fishy Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+/* ========== CSS RESET & VARIABLES ========== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --bg: #1a1b2e;
+  --panel: #252642;
+  --panel-light: #2f3058;
+  --border: #4a4580;
+  --border-light: #6b64b8;
+  --text: #f0e6d8;
+  --text-dim: #9d99b5;
+  --primary: #ff6b8a;
+  --primary-dark: #c4456a;
+  --gold: #ffd93d;
+  --gold-dark: #c4a320;
+  --green: #6bcb77;
+  --green-dark: #4a9e55;
+  --blue: #5b9cf5;
+  --blue-dark: #3c70c4;
+  --red: #ff4757;
+  --red-dark: #c43342;
+  --orange: #ff9f43;
+  --pixel-size: 4px;
+  --crt-green: #8eff8e;
+  --crt-bg: #0a1a0a;
+}
+
+/* ========== BASE ========== */
+html { font-size: 16px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 20px 10px 40px;
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 16px 16px;
+  image-rendering: pixelated;
+}
+
+/* ========== SCROLLBAR ========== */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--panel); }
+::-webkit-scrollbar-thumb { background: var(--border); border: 2px solid var(--panel); }
+
+/* ========== MAIN CONTAINER ========== */
+.container {
+  width: 100%;
+  max-width: 820px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ========== HEADER ========== */
+.header {
+  text-align: center;
+  padding: 20px 12px 8px;
+  position: relative;
+}
+.header .fish-icon {
+  font-size: 2.2rem;
+  display: inline-block;
+  animation: fishBounce 0.6s ease-in-out infinite alternate;
+}
+@keyframes fishBounce {
+  0% { transform: translateY(0) rotate(-3deg); }
+  100% { transform: translateY(-6px) rotate(3deg); }
+}
+.header h1 {
+  font-size: 1.3rem;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+  text-shadow: 3px 3px 0 var(--gold-dark), 0 0 20px rgba(255,217,61,0.3);
+  margin: 8px 0 4px;
+}
+.header .subtitle {
+  font-size: 0.45rem;
+  color: var(--text-dim);
+  letter-spacing: 0.15em;
+  animation: blinkText 2s step-end infinite;
+}
+@keyframes blinkText {
+  0%,100%{opacity:1;} 50%{opacity:0.3;}
+}
+
+/* ========== PANEL ========== */
+.panel {
+  background: var(--panel);
+  border: var(--pixel-size) solid var(--border);
+  box-shadow:
+    inset 0 0 0 2px var(--panel-light),
+    4px 4px 0 0 rgba(0,0,0,0.5),
+    0 0 0 var(--pixel-size) rgba(0,0,0,0.4);
+  padding: 16px;
+  position: relative;
+}
+.panel::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+}
+
+/* ========== TIMER DISPLAY (CRT) ========== */
+.timer-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.crt-display {
+  background: var(--crt-bg);
+  border: 6px solid #1a1a1a;
+  border-radius: 12px;
+  padding: 14px 28px;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 60px rgba(0,0,0,0.8),
+    0 0 30px rgba(142,255,142,0.15),
+    0 0 0 3px #333;
+  min-width: 260px;
+  text-align: center;
+}
+.crt-display::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0,0,0,0.08) 3px,
+    rgba(0,0,0,0.08) 6px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+.crt-display .timer-text {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 2.2rem;
+  color: var(--crt-green);
+  text-shadow: 0 0 10px rgba(142,255,142,0.7), 0 0 40px rgba(142,255,142,0.3);
+  letter-spacing: 0.1em;
+  position: relative;
+  z-index: 2;
+}
+.crt-display .timer-label {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.45rem;
+  color: rgba(142,255,142,0.5);
+  letter-spacing: 0.2em;
+  position: relative;
+  z-index: 2;
+  margin-top: 2px;
+}
+.crt-display.running .timer-text {
+  animation: crtFlicker 0.15s infinite alternate;
+}
+@keyframes crtFlicker {
+  0% { opacity: 1; }
+  50% { opacity: 0.97; }
+  100% { opacity: 0.99; }
+}
+/* CRT corner vignette */
+.crt-display::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.4) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+/* CRT power LED */
+.crt-led {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  z-index: 3;
+  background: #333;
+  box-shadow: 0 0 6px rgba(0,0,0,0.5);
+  transition: all 0.3s;
+}
+.crt-led.on {
+  background: #00ff00;
+  box-shadow: 0 0 8px #00ff00, 0 0 20px rgba(0,255,0,0.5);
+}
+.crt-led.warning {
+  background: #ff4757;
+  box-shadow: 0 0 8px #ff4757, 0 0 20px rgba(255,71,87,0.5);
+  animation: ledBlink 0.5s step-end infinite;
+}
+@keyframes ledBlink {
+  50% { opacity: 0.2; }
+}
+
+/* ========== PIXEL BUTTONS ========== */
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+.pixel-btn {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.55rem;
+  padding: 10px 18px;
+  cursor: pointer;
+  border: none;
+  color: #fff;
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  image-rendering: pixelated;
+  transition: all 0.1s;
+  /* 3D pixel border */
+  border-top: 4px solid rgba(255,255,255,0.3);
+  border-left: 4px solid rgba(255,255,255,0.3);
+  border-right: 4px solid rgba(0,0,0,0.4);
+  border-bottom: 4px solid rgba(0,0,0,0.4);
+  box-shadow: 0 4px 0 rgba(0,0,0,0.5);
+}
+.pixel-btn:hover {
+  filter: brightness(1.15);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 rgba(0,0,0,0.5);
+}
+.pixel-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.5);
+  border-top: 4px solid rgba(0,0,0,0.4);
+  border-left: 4px solid rgba(0,0,0,0.4);
+  border-right: 4px solid rgba(255,255,255,0.3);
+  border-bottom: 4px solid rgba(255,255,255,0.3);
+}
+.pixel-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: none;
+  transform: none;
+}
+.btn-start { background: var(--green); }
+.btn-pause { background: var(--gold); color: #333; }
+.btn-stop  { background: var(--red); }
+.btn-reset { background: var(--border); }
+
+/* ========== PANIC BUTTON ========== */
+.panic-btn {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.6rem;
+  padding: 12px 24px;
+  background: var(--red);
+  color: #fff;
+  cursor: pointer;
+  border: none;
+  animation: panicGlow 0.8s ease-in-out infinite alternate;
+  position: relative;
+  border-top: 4px solid rgba(255,255,255,0.4);
+  border-left: 4px solid rgba(255,255,255,0.4);
+  border-right: 4px solid rgba(0,0,0,0.5);
+  border-bottom: 4px solid rgba(0,0,0,0.5);
+  box-shadow: 0 4px 0 rgba(0,0,0,0.5);
+  letter-spacing: 0.1em;
+}
+.panic-btn:hover {
+  animation: panicGlowFast 0.25s ease-in-out infinite alternate;
+}
+.panic-btn:active {
+  transform: scale(0.95);
+  border-top: 4px solid rgba(0,0,0,0.5);
+  border-left: 4px solid rgba(0,0,0,0.5);
+  border-right: 4px solid rgba(255,255,255,0.4);
+  border-bottom: 4px solid rgba(255,255,255,0.4);
+}
+@keyframes panicGlow {
+  0% { box-shadow: 0 0 10px rgba(255,71,87,0.5), 0 4px 0 rgba(0,0,0,0.5); }
+  100% { box-shadow: 0 0 25px rgba(255,71,87,0.9), 0 4px 0 rgba(0,0,0,0.5); }
+}
+@keyframes panicGlowFast {
+  0% { box-shadow: 0 0 15px rgba(255,71,87,0.7), 0 4px 0 rgba(0,0,0,0.5); }
+  100% { box-shadow: 0 0 35px rgba(255,71,87,1), 0 4px 0 rgba(0,0,0,0.5); }
+}
+
+/* ========== ACTIVITY SELECTOR ========== */
+.section-title {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  text-align: center;
+  letter-spacing: 0.1em;
+}
+.activity-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.activity-btn {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.4rem;
+  padding: 10px 6px;
+  background: var(--panel-light);
+  color: var(--text);
+  cursor: pointer;
+  border: 3px solid var(--border);
+  transition: all 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  image-rendering: pixelated;
+}
+.activity-btn:hover {
+  border-color: var(--border-light);
+  background: var(--panel);
+  transform: translateY(-2px);
+  box-shadow: 0 3px 0 rgba(0,0,0,0.4);
+}
+.activity-btn.selected {
+  border-color: var(--gold);
+  background: rgba(255,217,61,0.1);
+  box-shadow: 0 0 12px rgba(255,217,61,0.2);
+  color: var(--gold);
+}
+.activity-btn .act-icon {
+  font-size: 1.4rem;
+  image-rendering: pixelated;
+}
+.activity-btn .act-label {
+  line-height: 1.3;
+}
+
+/* ========== STATS CARDS ========== */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.stat-card {
+  background: var(--panel-light);
+  border: 3px solid var(--border);
+  padding: 12px 8px;
+  text-align: center;
+}
+.stat-card .stat-value {
+  font-size: 1rem;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+.stat-card .stat-label {
+  font-size: 0.35rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* ========== ACHIEVEMENTS ========== */
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.ach-card {
+  background: var(--panel-light);
+  border: 3px solid var(--border);
+  padding: 10px 6px;
+  text-align: center;
+  transition: all 0.3s;
+  opacity: 0.5;
+  filter: grayscale(1);
+  position: relative;
+}
+.ach-card.unlocked {
+  opacity: 1;
+  filter: grayscale(0);
+  border-color: var(--gold);
+  animation: achUnlock 0.6s ease-out;
+}
+@keyframes achUnlock {
+  0% { transform: scale(1.2); border-color: #fff; box-shadow: 0 0 30px var(--gold); }
+  100% { transform: scale(1); border-color: var(--gold); box-shadow: 0 0 8px rgba(255,217,61,0.2); }
+}
+.ach-card .ach-icon {
+  font-size: 1.3rem;
+  margin-bottom: 4px;
+}
+.ach-card .ach-name {
+  font-size: 0.32rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+.ach-card.unlocked .ach-name {
+  color: var(--gold);
+}
+
+/* ========== HISTORY ========== */
+.history-list {
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 0.38rem;
+  line-height: 2;
+}
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--panel-light);
+  margin-bottom: 4px;
+  border-left: 3px solid var(--border);
+}
+.history-item .hi-activity { color: var(--gold); }
+.history-item .hi-time { color: var(--text-dim); }
+.history-item .hi-duration { color: var(--green); }
+.history-empty {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.4rem;
+  padding: 20px;
+}
+
+/* ========== PIE CHART ========== */
+.chart-panel-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  justify-content: center;
+}
+.chart-canvas-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.chart-canvas-wrap canvas {
+  image-rendering: pixelated;
+  border: 3px solid var(--border);
+  background: var(--panel-light);
+}
+.chart-center-text {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  line-height: 1.6;
+}
+.chart-center-text .center-label {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.38rem;
+  color: var(--text-dim);
+  display: block;
+}
+.chart-center-text .center-value {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.7rem;
+  color: var(--gold);
+  display: block;
+  margin-top: 2px;
+}
+.chart-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 256px;
+  overflow-y: auto;
+  min-width: 200px;
+}
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.4rem;
+  padding: 4px 0;
+}
+.chart-legend-color {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,0.3);
+  image-rendering: pixelated;
+}
+.chart-legend-name {
+  color: var(--text);
+  min-width: 50px;
+}
+.chart-legend-pct {
+  color: var(--gold);
+  min-width: 40px;
+  text-align: right;
+}
+.chart-legend-time {
+  color: var(--text-dim);
+  font-size: 0.32rem;
+}
+.chart-empty {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.4rem;
+  padding: 40px;
+}
+.chart-empty .empty-big {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 600px) {
+  .chart-panel-inner {
+    flex-direction: column;
+    align-items: center;
+  }
+  .chart-legend {
+    max-height: none;
+  }
+}
+
+/* ========== CHARACTER SCENE ========== */
+.character-section {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+.character-section canvas {
+  image-rendering: pixelated;
+  border: 3px solid var(--border);
+  background: #2a2740;
+  max-width: 100%;
+  height: auto;
+}
+
+/* ========== TOAST ========== */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--gold);
+  color: #1a1b2e;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.5rem;
+  padding: 12px 24px;
+  z-index: 1000;
+  border: 4px solid #000;
+  box-shadow: 6px 6px 0 rgba(0,0,0,0.5);
+  animation: toastIn 0.3s ease-out, toastOut 0.3s 2.5s ease-in forwards;
+  pointer-events: none;
+}
+@keyframes toastIn {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-30px); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes toastOut {
+  0% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+}
+
+/* ========== PANIC OVERLAY — EXCEL ========== */
+.panic-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  animation: panicIn 0.15s ease-out;
+  padding: 10px;
+}
+@keyframes panicIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* ===== Excel 主窗口 ===== */
+.excel-window {
+  width: 100%;
+  max-width: 1100px;
+  max-height: 92vh;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px #888;
+  border-radius: 0;
+  overflow: hidden;
+  font-family: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+}
+
+/* ===== 标题栏 ===== */
+.excel-titlebar {
+  background: #217346;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  height: 34px;
+  user-select: none;
+  font-size: 13px;
+}
+.excel-titlebar .title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.excel-titlebar .excel-icon {
+  width: 18px;
+  height: 18px;
+  background: #185a32;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  border-radius: 2px;
+  color: #fff;
+}
+.excel-titlebar .title-text {
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.excel-titlebar .title-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.excel-titlebar .tc-btn {
+  width: 34px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+}
+.excel-titlebar .tc-btn:hover { background: rgba(255,255,255,0.15); }
+.excel-titlebar .tc-btn.tc-close:hover { background: #e81123; }
+
+/* ===== 快速工具栏 QAT ===== */
+.excel-qat {
+  background: #217346;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  height: 26px;
+  border-bottom: 1px solid #1a5c38;
+}
+.excel-qat button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+  font-family: inherit;
+}
+.excel-qat button:hover { background: rgba(255,255,255,0.12); }
+
+/* ===== 功能标签栏（Ribbon Tabs） ===== */
+.excel-ribbon-tabs {
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  height: 28px;
+  border-bottom: 1px solid #d4d4d4;
+  padding: 0 4px;
+  font-size: 12px;
+  color: #444;
+}
+.excel-ribbon-tabs .tab {
+  padding: 4px 14px;
+  cursor: default;
+  border-radius: 4px 4px 0 0;
+  position: relative;
+}
+.excel-ribbon-tabs .tab:hover { background: #e0e0e0; }
+.excel-ribbon-tabs .tab.active {
+  background: #fff;
+  font-weight: 600;
+  color: #217346;
+  border: 1px solid #d4d4d4;
+  border-bottom: 1px solid #fff;
+  margin-bottom: -1px;
+}
+
+/* ===== Ribbon 工具栏区 ===== */
+.excel-ribbon {
+  background: #fafafa;
+  border-bottom: 1px solid #d4d4d4;
+  padding: 4px 8px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-size: 11px;
+}
+.excel-ribbon .ribbon-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: default;
+  color: #555;
+  min-width: 40px;
+}
+.excel-ribbon .ribbon-group:hover { background: #e8f0fe; border-color: #c0d8f0; }
+.excel-ribbon .ribbon-group .rg-icon {
+  font-size: 18px;
+  margin-bottom: 1px;
+}
+.excel-ribbon .ribbon-group .rg-label {
+  font-size: 10px;
+  white-space: nowrap;
+}
+.excel-ribbon .ribbon-sep {
+  width: 1px;
+  background: #d4d4d4;
+  margin: 0 4px;
+}
+
+/* ===== 编辑栏（名称框 + 公式栏） ===== */
+.excel-formula-bar {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  border-bottom: 1px solid #d4d4d4;
+  background: #fafafa;
+  font-size: 12px;
+}
+.excel-formula-bar .name-box {
+  width: 62px;
+  text-align: center;
+  border-right: 1px solid #d4d4d4;
+  padding: 2px 4px;
+  font-weight: 600;
+  color: #333;
+  background: #fff;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 10px;
+}
+.excel-formula-bar .fx-btn {
+  width: 28px;
+  text-align: center;
+  font-style: italic;
+  font-weight: bold;
+  color: #555;
+  cursor: default;
+  font-size: 13px;
+  font-family: 'Georgia', serif;
+}
+.excel-formula-bar .formula-input {
+  flex: 1;
+  border: none;
+  border-left: 1px solid #d4d4d4;
+  padding: 2px 8px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  color: #333;
+  background: #fff;
+  outline: none;
+}
+
+/* ===== 电子表格容器 ===== */
+.excel-grid-wrap {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  background: #e8e8e8;
+}
+.excel-grid-wrap table {
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.excel-grid-wrap td, .excel-grid-wrap th {
+  border: 1px solid #c0c0c0;
+  padding: 0;
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+/* 列标题 */
+.excel-grid-wrap .col-header {
+  background: #f0f0f0;
+  text-align: center;
+  font-weight: 500;
+  font-size: 11px;
+  color: #555;
+  height: 24px;
+  min-width: 38px;
+  border-top: 1px solid #d0d0d0;
+  border-left: 1px solid #d0d0d0;
+  border-right: 1px solid #b8b8b8;
+  border-bottom: 1px solid #b8b8b8;
+  user-select: none;
+}
+.excel-grid-wrap .col-header.selected {
+  background: #d4e8d4;
+  border-color: #217346;
+}
+
+/* 行号 */
+.excel-grid-wrap .row-header {
+  background: #f0f0f0;
+  text-align: center;
+  font-size: 10px;
+  color: #888;
+  min-width: 36px;
+  width: 36px;
+  height: 22px;
+  border-right: 1px solid #b8b8b8;
+  border-bottom: 1px solid #c0c0c0;
+  user-select: none;
+}
+
+/* 数据单元格 */
+.excel-grid-wrap .cell {
+  font-size: 11px;
+  color: #222;
+  height: 22px;
+  padding: 0 4px;
+  white-space: nowrap;
+  min-width: 70px;
+  background: #fff;
+  font-family: 'Consolas', 'Microsoft YaHei', sans-serif;
+}
+.excel-grid-wrap .cell.currency { text-align: right; color: #0a4a0a; }
+.excel-grid-wrap .cell.number  { text-align: right; }
+.excel-grid-wrap .cell.date    { text-align: center; color: #336; }
+.excel-grid-wrap .cell.percent { text-align: right; color: #6a0dad; }
+.excel-grid-wrap .cell.bold    { font-weight: bold; }
+.excel-grid-wrap .cell.merged-title {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #217346;
+  background: #e8f5e9;
+  letter-spacing: 4px;
+}
+.excel-grid-wrap .cell.header-cell {
+  text-align: center;
+  font-weight: 600;
+  font-size: 11px;
+  color: #fff;
+  background: #217346;
+}
+.excel-grid-wrap .cell.total-row {
+  text-align: right;
+  font-weight: bold;
+  font-size: 12px;
+  color: #b71c1c;
+  background: #fff8e1;
+  border-top: 2px solid #217346;
+}
+.excel-grid-wrap .cell.total-label {
+  text-align: center;
+  font-weight: bold;
+  font-size: 11px;
+  color: #333;
+  background: #fff8e1;
+  border-top: 2px solid #217346;
+}
+
+/* 当前选中单元格高亮 */
+.excel-grid-wrap .cell.active-cell {
+  outline: 2px solid #217346;
+  outline-offset: -1px;
+  z-index: 2;
+  position: relative;
+}
+
+/* 滚动条 */
+.excel-grid-wrap::-webkit-scrollbar { width: 12px; height: 12px; }
+.excel-grid-wrap::-webkit-scrollbar-track { background: #e8e8e8; border: 1px solid #d0d0d0; }
+.excel-grid-wrap::-webkit-scrollbar-thumb { background: #c0c0c0; border: 1px solid #a0a0a0; }
+.excel-grid-wrap::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+
+/* ===== 底部 Sheet 标签栏 ===== */
+.excel-sheet-tabs {
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  height: 30px;
+  border-top: 1px solid #d4d4d4;
+  padding: 0 4px;
+  gap: 2px;
+  font-size: 11px;
+}
+.excel-sheet-tabs .sheet-tab {
+  background: #e8e8e8;
+  padding: 4px 18px;
+  border-radius: 0 0 6px 6px;
+  border: 1px solid #d0d0d0;
+  border-top: none;
+  cursor: default;
+  color: #555;
+}
+.excel-sheet-tabs .sheet-tab.active {
+  background: #fff;
+  font-weight: 600;
+  color: #217346;
+  border-bottom: 2px solid #217346;
+}
+.excel-sheet-tabs .new-sheet {
+  width: 24px; height: 24px;
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  color: #888;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* ===== 状态栏 ===== */
+.excel-statusbar {
+  background: #217346;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+.excel-statusbar .status-left {
+  opacity: 0.9;
+}
+
+/* ===== Safe 按钮 ===== */
+.panic-overlay .safe-btn {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.5rem;
+  padding: 10px 24px;
+  background: var(--green);
+  color: #fff;
+  cursor: pointer;
+  border: none;
+  border-top: 4px solid rgba(255,255,255,0.4);
+  border-left: 4px solid rgba(255,255,255,0.4);
+  border-right: 4px solid rgba(0,0,0,0.5);
+  border-bottom: 4px solid rgba(0,0,0,0.5);
+  box-shadow: 0 4px 0 rgba(0,0,0,0.5);
+  letter-spacing: 0.1em;
+  animation: var(--pixel-size) ease-in-out;
+}
+.panic-overlay .safe-btn:hover {
+  filter: brightness(1.2);
+  transform: translateY(-2px);
+}
+.panic-overlay .safe-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.5);
+}
+
+@media (max-width: 800px) {
+  .excel-window { max-height: 98vh; font-size: 10px; }
+  .excel-grid-wrap .cell { font-size: 9px; height: 20px; }
+  .excel-grid-wrap .col-header { font-size: 9px; min-width: 28px; height: 20px; }
+  .excel-grid-wrap .row-header { font-size: 8px; min-width: 24px; width: 24px; }
+  .excel-grid-wrap .cell.merged-title { font-size: 12px; letter-spacing: 2px; }
+}
+
+/* 文件加载按钮 */
+.file-load-area {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.file-load-btn {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.42rem;
+  padding: 8px 14px;
+  background: #5b9cf5;
+  color: #fff;
+  cursor: pointer;
+  border: none;
+  border-top: 3px solid rgba(255,255,255,0.4);
+  border-left: 3px solid rgba(255,255,255,0.4);
+  border-right: 3px solid rgba(0,0,0,0.5);
+  border-bottom: 3px solid rgba(0,0,0,0.5);
+  box-shadow: 0 3px 0 rgba(0,0,0,0.5);
+  letter-spacing: 0.05em;
+  transition: all 0.1s;
+}
+.file-load-btn:hover {
+  filter: brightness(1.15);
+  transform: translateY(-2px);
+}
+.file-load-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.5);
+}
+.file-load-btn.loaded {
+  background: #6bcb77;
+}
+.excel-file-indicator {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.35rem;
+  color: var(--green);
+  text-align: center;
+  margin-top: 4px;
+  min-height: 1.2em;
+}
+
+/* ===== Cell 编辑覆盖层 ===== */
+.excel-grid-wrap .cell-editing {
+  position: absolute;
+  background: #fff;
+  border: 2px solid #217346;
+  outline: none;
+  font-family: 'Consolas', 'Microsoft YaHei', sans-serif;
+  font-size: 11px;
+  padding: 0 3px;
+  color: #222;
+  z-index: 10;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+  white-space: nowrap;
+}
+
+/* 多选区域高亮 */
+.excel-grid-wrap .cell.in-selection {
+  background: #d4e8f0;
+  outline: 1px solid #8ab4d8;
+  outline-offset: -1px;
+}
+.excel-grid-wrap .cell.active-cell {
+  outline: 2px solid #217346 !important;
+  outline-offset: -1px;
+  background: #fff !important;
+  z-index: 2;
+  position: relative;
+}
+
+/* 行列标题选中 */
+.excel-grid-wrap .col-header.selected { background: #d4e8d4; border-color: #217346; }
+.excel-grid-wrap .row-header.selected { background: #d4e8d4; border-color: #217346; color: #333; font-weight: 600; }
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 600px) {
+  .header h1 { font-size: 1rem; }
+  .crt-display .timer-text { font-size: 1.4rem; }
+  .crt-display { padding: 10px 16px; min-width: 200px; }
+  .activity-grid { grid-template-columns: repeat(3, 1fr); }
+  .stats-row { grid-template-columns: repeat(3, 1fr); }
+  .achievement-grid { grid-template-columns: repeat(2, 1fr); }
+  .pixel-btn { font-size: 0.45rem; padding: 8px 12px; }
+  .btn-row { gap: 8px; }
+}
+@media (max-width: 380px) {
+  .activity-grid { grid-template-columns: repeat(2, 1fr); }
+  .crt-display .timer-text { font-size: 1.1rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="header">
+    <span class="fish-icon">🐟</span>
+    <h1>摸 鱼 计 时 器</h1>
+    <div class="subtitle">▶ FISHY TIMER · PIXEL EDITION</div>
+  </div>
+
+  <!-- TIMER PANEL -->
+  <div class="panel">
+    <div class="timer-section">
+      <!-- CRT Display -->
+      <div class="crt-display" id="crtDisplay">
+        <div class="crt-led" id="crtLed"></div>
+        <div class="timer-text" id="timerText">00:00:00</div>
+        <div class="timer-label" id="timerLabel">READY</div>
+      </div>
+
+      <!-- Control Buttons -->
+      <div class="btn-row">
+        <button class="pixel-btn btn-start" id="btnStart" title="开始摸鱼">▶ 开始</button>
+        <button class="pixel-btn btn-pause" id="btnPause" title="暂停摸鱼" disabled>⏸ 暂停</button>
+        <button class="pixel-btn btn-stop"  id="btnStop"  title="结束本次摸鱼" disabled>⏹ 结算</button>
+        <button class="pixel-btn btn-reset" id="btnReset" title="重置计时器">↺ 重置</button>
+      </div>
+
+      <!-- Panic Button -->
+      <button class="panic-btn" id="btnPanic">
+        🚨 老 板 来 了 ! ! 🚨
+      </button>
+
+      <!-- Excel 文件加载 -->
+      <div class="file-load-area">
+        <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="display:none">
+        <button class="file-load-btn" id="btnLoadExcel">
+          📂 加载 Excel 文件
+        </button>
+        <button class="file-load-btn" id="btnClearExcel" style="background:#ff6b8a;display:none;">
+          🗑 清除加载
+        </button>
+      </div>
+      <div class="excel-file-indicator" id="excelFileIndicator"></div>
+    </div>
+  </div>
+
+  <!-- ACTIVITY SELECTOR -->
+  <div class="panel">
+    <div class="section-title">🎯 选 择 摸 鱼 活 动</div>
+    <div class="activity-grid" id="activityGrid">
+      <button class="activity-btn selected" data-activity="刷手机">
+        <span class="act-icon">📱</span>
+        <span class="act-label">刷手机</span>
+      </button>
+      <button class="activity-btn" data-activity="聊天摸鱼">
+        <span class="act-icon">💬</span>
+        <span class="act-label">聊天</span>
+      </button>
+      <button class="activity-btn" data-activity="喝咖啡">
+        <span class="act-icon">☕</span>
+        <span class="act-label">喝咖啡</span>
+      </button>
+      <button class="activity-btn" data-activity="玩游戏">
+        <span class="act-icon">🎮</span>
+        <span class="act-label">玩游戏</span>
+      </button>
+      <button class="activity-btn" data-activity="看视频">
+        <span class="act-icon">📺</span>
+        <span class="act-label">看视频</span>
+      </button>
+      <button class="activity-btn" data-activity="发呆放空">
+        <span class="act-icon">😴</span>
+        <span class="act-label">发呆</span>
+      </button>
+      <button class="activity-btn" data-activity="网购剁手">
+        <span class="act-icon">🛒</span>
+        <span class="act-label">网购</span>
+      </button>
+      <button class="activity-btn" data-activity="看小说">
+        <span class="act-icon">📖</span>
+        <span class="act-label">看小说</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="panel">
+    <div class="section-title">📊 今 日 统 计</div>
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" id="statSessions">0</div>
+        <div class="stat-label">摸鱼次数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statTotalTime">0分钟</div>
+        <div class="stat-label">总摸鱼时长</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statLongest">0分钟</div>
+        <div class="stat-label">最长单次</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIE CHART — 活动时长分布 -->
+  <div class="panel">
+    <div class="section-title">🍩 今 日 摸 鱼 分 布</div>
+    <div class="chart-panel-inner" id="chartPanelInner">
+      <div class="chart-canvas-wrap">
+        <canvas id="pieChartCanvas" width="256" height="256"></canvas>
+        <div class="chart-center-text">
+          <span class="center-label">今日总计</span>
+          <span class="center-value" id="chartCenterVal">—</span>
+        </div>
+      </div>
+      <div class="chart-legend" id="chartLegend">
+        <div class="chart-empty">
+          <span class="empty-big">🥧</span>
+          还没有摸鱼数据<br>开始计时后这里会显示分布图
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACHIEVEMENTS -->
+  <div class="panel">
+    <div class="section-title">🏆 成 就 墙</div>
+    <div class="achievement-grid" id="achievementGrid">
+      <div class="ach-card" data-ach="first-session">
+        <div class="ach-icon">🎉</div>
+        <div class="ach-name">初次摸鱼</div>
+      </div>
+      <div class="ach-card" data-ach="one-hour">
+        <div class="ach-icon">⏰</div>
+        <div class="ach-name">摸鱼1小时</div>
+      </div>
+      <div class="ach-card" data-ach="ten-hours">
+        <div class="ach-icon">🔥</div>
+        <div class="ach-name">摸鱼10小时</div>
+      </div>
+      <div class="ach-card" data-ach="god">
+        <div class="ach-icon">👑</div>
+        <div class="ach-name">摸鱼之神</div>
+      </div>
+      <div class="ach-card" data-ach="long-session">
+        <div class="ach-icon">🐢</div>
+        <div class="ach-name">超长待机</div>
+      </div>
+      <div class="ach-card" data-ach="five-straight">
+        <div class="ach-icon">📅</div>
+        <div class="ach-name">连续摸鱼</div>
+      </div>
+      <div class="ach-card" data-ach="coffee-master">
+        <div class="ach-icon">☕</div>
+        <div class="ach-name">咖啡达人</div>
+      </div>
+      <div class="ach-card" data-ach="game-king">
+        <div class="ach-icon">🕹️</div>
+        <div class="ach-name">游戏高手</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="panel">
+    <div class="section-title">📜 今 日 摸 鱼 记 录</div>
+    <div class="history-list" id="historyList">
+      <div class="history-empty">还没有摸鱼记录哦~<br>快来开始你的第一次摸鱼吧！🐟</div>
+    </div>
+  </div>
+
+  <!-- CHARACTER SCENE -->
+  <div class="panel">
+    <div class="section-title">🎨 办 公 室 实 况</div>
+    <div class="character-section">
+      <canvas id="characterCanvas" width="320" height="200"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<!-- PANIC OVERLAY — 动态电子表格 (hidden by default) -->
+<div class="panic-overlay" id="panicOverlay" style="display:none;">
+  <div class="excel-window" id="excelWindow">
+
+    <!-- 标题栏 -->
+    <div class="excel-titlebar">
+      <div class="title-left">
+        <div class="excel-icon">X</div>
+        <span class="title-text" id="excelTitleText">季度销售报表 - Excel</span>
+        <span style="font-size:10px;opacity:0.7;margin-left:12px;" id="excelSaveIndicator">● 已保存</span>
+      </div>
+      <div class="title-controls">
+        <span class="tc-btn">─</span>
+        <span class="tc-btn">□</span>
+        <span class="tc-btn tc-close" id="btnExcelClose">✕</span>
+      </div>
+    </div>
+
+    <!-- 快速访问工具栏 -->
+    <div class="excel-qat">
+      <button onclick="ssEngine.save()" title="Ctrl+S">💾 保存</button>
+      <button onclick="ssEngine.undo()" title="Ctrl+Z">↩ 撤消</button>
+      <button onclick="ssEngine.redo()" title="Ctrl+Y">↪ 恢复</button>
+      <span style="color:rgba(255,255,255,0.3);margin:0 8px;">|</span>
+      <button onclick="ssEngine.newSheet()" title="Ctrl+N">📄 新建</button>
+    </div>
+
+    <!-- 功能标签 -->
+    <div class="excel-ribbon-tabs" id="excelRibbonTabs">
+      <span class="tab">文件</span>
+      <span class="tab active">开始</span>
+      <span class="tab">插入</span>
+      <span class="tab">页面布局</span>
+      <span class="tab">公式</span>
+      <span class="tab">数据</span>
+      <span class="tab">审阅</span>
+      <span class="tab">视图</span>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="excel-ribbon">
+      <div class="ribbon-group" onclick="ssEngine.copy()" style="cursor:pointer;" title="Ctrl+C">
+        <span class="rg-icon">📝</span><span class="rg-label">复制</span>
+      </div>
+      <div class="ribbon-group" onclick="ssEngine.paste()" style="cursor:pointer;" title="Ctrl+V">
+        <span class="rg-icon">📋</span><span class="rg-label">粘贴</span>
+      </div>
+      <div class="ribbon-group" onclick="ssEngine.cut()" style="cursor:pointer;" title="Ctrl+X">
+        <span class="rg-icon">✂️</span><span class="rg-label">剪切</span>
+      </div>
+      <span class="ribbon-sep"></span>
+      <div class="ribbon-group" onclick="ssEngine.formatCell('bold')" style="cursor:pointer;" title="Ctrl+B">
+        <span class="rg-icon"><b>B</b></span><span class="rg-label">加粗</span>
+      </div>
+      <div class="ribbon-group" onclick="ssEngine.formatCell('italic')" style="cursor:pointer;" title="Ctrl+I">
+        <span class="rg-icon"><i>I</i></span><span class="rg-label">倾斜</span>
+      </div>
+      <span class="ribbon-sep"></span>
+      <div class="ribbon-group" onclick="ssEngine.formatCell('currency')" style="cursor:pointer;">
+        <span class="rg-icon">¥</span><span class="rg-label">货币</span>
+      </div>
+      <div class="ribbon-group" onclick="ssEngine.formatCell('percent')" style="cursor:pointer;">
+        <span class="rg-icon">%</span><span class="rg-label">百分比</span>
+      </div>
+      <div class="ribbon-group" onclick="ssEngine.formatCell('number')" style="cursor:pointer;">
+        <span class="rg-icon">#</span><span class="rg-label">数值</span>
+      </div>
+      <span class="ribbon-sep"></span>
+      <div class="ribbon-group" onclick="ssEngine.insertRow()" style="cursor:pointer;">
+        <span class="rg-icon">⬇</span><span class="rg-label">插入行</span>
+      </div>
+      <div class="ribbon-group" onclick="ssEngine.deleteRow()" style="cursor:pointer;">
+        <span class="rg-icon">🗑</span><span class="rg-label">删除行</span>
+      </div>
+      <div class="ribbon-group" onclick="ssEngine.insertCol()" style="cursor:pointer;">
+        <span class="rg-icon">➡</span><span class="rg-label">插入列</span>
+      </div>
+    </div>
+
+    <!-- 编辑栏 -->
+    <div class="excel-formula-bar">
+      <div class="name-box" id="excelNameBox">A1</div>
+      <div class="fx-btn">fx</div>
+      <input class="formula-input" id="excelFormulaInput"
+             placeholder="输入内容或公式，如 =SUM(A1:A10)"
+             spellcheck="false" autocomplete="off">
+    </div>
+
+    <!-- 电子表格 = JS 动态渲染 -->
+    <div class="excel-grid-wrap" id="excelGridWrap">
+      <table id="excelGridTable">
+        <thead id="excelGridHead"></thead>
+        <tbody id="excelGridBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Sheet 标签栏 -->
+    <div class="excel-sheet-tabs" id="excelSheetTabs">
+      <span class="sheet-tab active">📋 Sheet1</span>
+      <button class="new-sheet" onclick="ssEngine.addSheet()">+</button>
+    </div>
+
+    <!-- 状态栏 -->
+    <div class="excel-statusbar" id="excelStatusBar">
+      <span class="status-left">就绪</span>
+      <span id="excelStatusSum">求和: — &nbsp;|&nbsp; 平均值: — &nbsp;|&nbsp; 计数: 0</span>
+    </div>
+  </div>
+
+  <button class="safe-btn" id="btnSafe">✅ 老板走了，继续摸鱼</button>
+</div>
+
+<script>
+// ==================== 摸鱼计时器 — 核心脚本 ====================
+
+// ---- DOM 引用 ----
+const $timerText   = document.getElementById('timerText');
+const $timerLabel  = document.getElementById('timerLabel');
+const $crtDisplay  = document.getElementById('crtDisplay');
+const $crtLed      = document.getElementById('crtLed');
+const $btnStart    = document.getElementById('btnStart');
+const $btnPause    = document.getElementById('btnPause');
+const $btnStop     = document.getElementById('btnStop');
+const $btnReset    = document.getElementById('btnReset');
+const $btnPanic    = document.getElementById('btnPanic');
+const $panicOverlay= document.getElementById('panicOverlay');
+const $btnSafe     = document.getElementById('btnSafe');
+const $activityGrid= document.getElementById('activityGrid');
+const $historyList = document.getElementById('historyList');
+const $achGrid     = document.getElementById('achievementGrid');
+const $statSessions= document.getElementById('statSessions');
+const $statTotal   = document.getElementById('statTotalTime');
+const $statLongest = document.getElementById('statLongest');
+const $canvas      = document.getElementById('characterCanvas');
+const ctx          = $canvas.getContext('2d');
+const $pieCanvas   = document.getElementById('pieChartCanvas');
+const pieCtx       = $pieCanvas.getContext('2d');
+const $chartLegend = document.getElementById('chartLegend');
+const $chartCenter = document.getElementById('chartCenterVal');
+
+// ---- 状态 ----
+let timerSeconds    = 0;       // 当前计时秒数
+let timerInterval   = null;    // setInterval ID
+let timerRunning    = false;   // 是否正在计时
+let timerPaused     = false;   // 是否暂停
+let selectedActivity= '刷手机'; // 当前选中的活动
+let data            = null;    // 持久化数据
+let panicActive     = false;   // 老板来了模式
+let animFrame       = 0;       // 角色动画帧
+let characterMood   = 'idle';  // 'idle'|'working'|'slacking'|'panic'
+
+// ---- 成就定义 ----
+const ACHIEVEMENTS = {
+  'first-session':   { icon:'🎉', name:'初次摸鱼',    desc:'完成第一次摸鱼',       check: d => d.totalSessionsAllTime >= 1 },
+  'one-hour':        { icon:'⏰', name:'摸鱼 1 小时',  desc:'累计摸鱼满 1 小时',    check: d => d.totalSecondsAllTime >= 3600 },
+  'ten-hours':       { icon:'🔥', name:'摸鱼 10 小时', desc:'累计摸鱼满 10 小时',   check: d => d.totalSecondsAllTime >= 36000 },
+  'god':             { icon:'👑', name:'摸鱼之神',     desc:'累计摸鱼满 100 小时',  check: d => d.totalSecondsAllTime >= 360000 },
+  'long-session':    { icon:'🐢', name:'超长待机',     desc:'单次摸鱼超过 2 小时', check: d => d.longestEver >= 7200 },
+  'five-straight':   { icon:'📅', name:'连续摸鱼',     desc:'连续 5 天摸鱼',        check: d => d.consecutiveDays >= 5 },
+  'coffee-master':   { icon:'☕', name:'咖啡达人',     desc:'喝咖啡摸鱼 10 次',     check: d => (d.activityCounts||{})['喝咖啡'] >= 10 },
+  'game-king':       { icon:'🕹️', name:'游戏高手',     desc:'玩游戏摸鱼 10 次',     check: d => (d.activityCounts||{})['玩游戏'] >= 10 },
+};
+
+// ---- 数据管理 ----
+const STORAGE_KEY = 'fishy_timer_data';
+
+function defaultData() {
+  return {
+    today: getDateString(),
+    todaySessions: 0,
+    todayTotalSeconds: 0,
+    todayLongestSession: 0,
+    history: [],           // { date, activity, duration, startTime }
+    achievements: [],      // string[]
+    totalSessionsAllTime: 0,
+    totalSecondsAllTime: 0,
+    longestEver: 0,
+    consecutiveDays: 1,
+    lastActiveDate: getDateString(),
+    activityCounts: {},        // { activityName: count }
+    todayActivitySeconds: {},  // { activityName: totalSeconds } — 每日活动时长
+  };
+}
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      // 检查是否新的一天
+      if (d.today !== getDateString()) {
+        // 处理连续天数
+        const yesterday = getDateString(-1);
+        if (d.lastActiveDate === yesterday) {
+          d.consecutiveDays = (d.consecutiveDays || 1) + 1;
+        } else if (d.lastActiveDate !== getDateString()) {
+          d.consecutiveDays = 1;
+        }
+        d.today = getDateString();
+        d.todaySessions = 0;
+        d.todayTotalSeconds = 0;
+        d.todayLongestSession = 0;
+        d.history = [];
+        d.todayActivitySeconds = {};
+      }
+      // 补齐缺失字段
+      if (!d.activityCounts) d.activityCounts = {};
+      if (!d.todayActivitySeconds) d.todayActivitySeconds = {};
+      if (!d.totalSessionsAllTime) d.totalSessionsAllTime = d.todaySessions;
+      if (!d.totalSecondsAllTime) d.totalSecondsAllTime = d.todayTotalSeconds;
+      if (!d.longestEver) d.longestEver = d.todayLongestSession;
+      if (!d.lastActiveDate) d.lastActiveDate = d.today;
+      if (!d.consecutiveDays) d.consecutiveDays = 1;
+      return d;
+    }
+  } catch (e) { /* ignore */ }
+  return defaultData();
+}
+
+function saveData() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) { /* ignore */ }
+}
+
+function getDateString(offsetDays = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ---- 工具函数 ----
+function formatTime(totalSeconds) {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function formatDuration(totalSeconds) {
+  if (totalSeconds < 60) return `${totalSeconds}秒`;
+  if (totalSeconds < 3600) return `${Math.floor(totalSeconds/60)}分钟`;
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  return `${h}小时${m}分钟`;
+}
+
+function formatTimeOfDay() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+}
+
+function showToast(msg) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ---- 计时器核心 ----
+
+// 结算当前活动段（把 timerSeconds 作为已完成的一段记录到历史/统计中）
+function settleCurrentSegment() {
+  const duration = timerSeconds;
+  if (duration <= 0) return;
+
+  const record = {
+    date: getDateString(),
+    activity: selectedActivity,
+    duration: duration,
+    startTime: formatTimeOfDay(),
+  };
+  data.history.unshift(record);
+  data.todaySessions++;
+  data.todayTotalSeconds += duration;
+  if (duration > data.todayLongestSession) data.todayLongestSession = duration;
+  if (duration > data.longestEver) data.longestEver = duration;
+  data.totalSessionsAllTime++;
+  data.totalSecondsAllTime += duration;
+  data.lastActiveDate = getDateString();
+
+  // 活动计数
+  if (!data.activityCounts) data.activityCounts = {};
+  data.activityCounts[selectedActivity] = (data.activityCounts[selectedActivity] || 0) + 1;
+
+  // 每日活动时长累计
+  if (!data.todayActivitySeconds) data.todayActivitySeconds = {};
+  data.todayActivitySeconds[selectedActivity] = (data.todayActivitySeconds[selectedActivity] || 0) + duration;
+
+  showToast(`✅ ${selectedActivity} · ${formatDuration(duration)}`);
+}
+
+// 切换摸鱼活动（无需暂停，自动结算当前段）
+function switchActivity(newActivity) {
+  if (newActivity === selectedActivity) return;
+
+  if (timerRunning && !timerPaused) {
+    // 正在计时中 → 先结算当前活动段，再无缝切换到新活动
+    settleCurrentSegment();
+    timerSeconds = 0;
+    selectedActivity = newActivity;
+    updateTimerDisplay();
+    $timerLabel.textContent = '▶ ' + newActivity;
+    showToast(`🔄 切换到「${newActivity}」`);
+    checkAchievements();
+    saveData();
+    refreshUI();
+  } else if (timerPaused) {
+    // 暂停中 → 结算当前段，切换活动，保持暂停状态
+    settleCurrentSegment();
+    timerSeconds = 0;
+    selectedActivity = newActivity;
+    updateTimerDisplay();
+    $timerLabel.textContent = '⏸ PAUSED · ' + newActivity;
+    showToast(`🔄 切换到「${newActivity}」`);
+    checkAchievements();
+    saveData();
+    refreshUI();
+  } else {
+    // 未在计时 → 直接切换
+    selectedActivity = newActivity;
+    $timerLabel.textContent = 'READY';
+  }
+}
+
+function startTimer() {
+  if (timerRunning && !timerPaused) return;
+  if (timerPaused) {
+    // 恢复
+    timerPaused = false;
+  }
+  timerRunning = true;
+  $crtDisplay.classList.add('running');
+  $crtLed.classList.add('on');
+  $crtLed.classList.remove('warning');
+  $timerLabel.textContent = '▶ ' + selectedActivity;
+  $btnStart.disabled = true;
+  $btnPause.disabled = false;
+  $btnStop.disabled = false;
+  characterMood = 'slacking';
+  updateButtons();
+
+  timerInterval = setInterval(() => {
+    timerSeconds++;
+    updateTimerDisplay();
+  }, 1000);
+}
+
+function pauseTimer() {
+  if (!timerRunning || timerPaused) return;
+  timerPaused = true;
+  clearInterval(timerInterval);
+  timerInterval = null;
+  $crtDisplay.classList.remove('running');
+  $crtLed.classList.add('warning');
+  $timerLabel.textContent = '⏸ PAUSED · ' + selectedActivity;
+  $btnStart.disabled = false;
+  $btnPause.disabled = true;
+  $btnStart.textContent = '▶ 继续';
+  characterMood = 'idle';
+  updateButtons();
+}
+
+function stopTimer() {
+  if (!timerRunning && timerSeconds === 0) return;
+  clearInterval(timerInterval);
+  timerInterval = null;
+
+  // 结算当前段
+  settleCurrentSegment();
+
+  // 重置计时器
+  timerSeconds = 0;
+  timerRunning = false;
+  timerPaused = false;
+  $crtDisplay.classList.remove('running');
+  $crtLed.classList.remove('on', 'warning');
+  $timerLabel.textContent = 'READY';
+  $btnStart.textContent = '▶ 开始';
+  $btnStart.disabled = false;
+  $btnPause.disabled = true;
+  $btnStop.disabled = true;
+  characterMood = 'idle';
+  updateTimerDisplay();
+  updateButtons();
+
+  // 检查成就 & 保存
+  checkAchievements();
+  saveData();
+  refreshUI();
+}
+
+function resetTimer() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+  timerSeconds = 0;
+  timerRunning = false;
+  timerPaused = false;
+  $crtDisplay.classList.remove('running');
+  $crtLed.classList.remove('on', 'warning');
+  $timerLabel.textContent = 'READY';
+  $btnStart.textContent = '▶ 开始';
+  $btnStart.disabled = false;
+  $btnPause.disabled = true;
+  $btnStop.disabled = true;
+  characterMood = 'idle';
+  updateTimerDisplay();
+  updateButtons();
+}
+
+function updateTimerDisplay() {
+  $timerText.textContent = formatTime(timerSeconds);
+}
+
+function updateButtons() {
+  if (timerRunning && !timerPaused) {
+    $btnStart.disabled = true;
+    $btnPause.disabled = false;
+    $btnStop.disabled = false;
+  } else if (timerPaused) {
+    $btnStart.disabled = false;
+    $btnPause.disabled = true;
+    $btnStop.disabled = false;
+    $btnStart.textContent = '▶ 继续';
+  } else {
+    $btnStart.disabled = false;
+    $btnPause.disabled = true;
+    $btnStop.disabled = true;
+    $btnStart.textContent = '▶ 开始';
+  }
+}
+
+// ==========================================
+//  Excel 电子表格引擎 — SpreadsheetEngine
+// ==========================================
+
+const MAX_ROWS = 200, MAX_COLS = 26;  // A-Z
+
+function colToLetter(col) { return String.fromCharCode(64 + ((col - 1) % 26) + 1); }
+function letterToCol(letter) { return letter.toUpperCase().charCodeAt(0) - 64; }
+function cellRef(col, row) { return colToLetter(col) + row; }
+function parseCellRef(ref) {
+  const m = ref.toUpperCase().match(/^([A-Z]+)(\d+)$/);
+  if (!m) return null;
+  return { col: letterToCol(m[1]), row: parseInt(m[2]) };
+}
+function parseRange(ref) {
+  const parts = ref.split(':');
+  if (parts.length !== 2) return null;
+  const s = parseCellRef(parts[0]), e = parseCellRef(parts[1]);
+  if (!s || !e) return null;
+  return {
+    colStart: Math.min(s.col, e.col), colEnd: Math.max(s.col, e.col),
+    rowStart: Math.min(s.row, e.row), rowEnd: Math.max(s.row, e.row),
+  };
+}
+function formatCurrency(v) {
+  if (typeof v !== 'number' || isNaN(v)) return v;
+  return '¥ ' + v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+class SpreadsheetEngine {
+  constructor() {
+    this.cells = {};         // { "A1": { raw, display, formula, fmt } }
+    this.colWidths = {};
+    this.rowHeights = {};
+    this.activeCell = 'A1';
+    this.selectionStart = 'A1';
+    this.selectionEnd = 'A1';
+    this.clipboard = null;
+    this.clipboardMode = null; // 'copy' | 'cut'
+    this.undoStack = [];
+    this.redoStack = [];
+    this.dirty = false;
+    this.numRows = 50;
+    this.numCols = 12;
+    this.loadedFileName = null;
+    this.loadedFileData = null;
+    this.sheetName = 'Sheet1';
+  }
+
+  // ---- Cell access ----
+  cellRef(col, row) { return cellRef(col, row); }
+
+  getCell(ref) {
+    if (!this.cells[ref]) this.cells[ref] = { raw: '', display: '', formula: null, fmt: null };
+    return this.cells[ref];
+  }
+
+  setCellRaw(ref, raw) {
+    const c = this.getCell(ref);
+    this.pushUndo(ref, c.raw, raw);
+    c.raw = raw;
+    if (raw && raw.toString().startsWith('=')) {
+      c.formula = raw;
+      c.display = this.evaluateFormula(raw, ref);
+    } else {
+      c.formula = null;
+      c.display = raw;
+    }
+    this.dirty = true;
+    this.recalcDependents(ref);
+  }
+
+  pushUndo(ref, oldVal, newVal) {
+    this.undoStack.push({ ref, oldVal, newVal });
+    if (this.undoStack.length > 500) this.undoStack.shift();
+    this.redoStack = [];
+  }
+
+  undo() {
+    if (this.undoStack.length === 0) return;
+    const action = this.undoStack.pop();
+    this.redoStack.push({ ref: action.ref, oldVal: this.getCell(action.ref).raw, newVal: action.oldVal });
+    const c = this.getCell(action.ref);
+    c.raw = action.oldVal;
+    c.formula = (action.oldVal && action.oldVal.toString().startsWith('=')) ? action.oldVal : null;
+    c.display = action.oldVal;
+    this.dirty = true;
+    this.render();
+  }
+
+  redo() {
+    if (this.redoStack.length === 0) return;
+    const action = this.redoStack.pop();
+    this.undoStack.push({ ref: action.ref, oldVal: this.getCell(action.ref).raw, newVal: action.newVal });
+    this.setCellRaw(action.ref, action.newVal);
+    this.render();
+  }
+
+  // ---- Formula evaluator ----
+  evaluateFormula(formula, selfRef) {
+    if (!formula || !formula.startsWith('=')) return formula;
+    const expr = formula.substring(1).trim();
+
+    // SUM
+    const sumMatch = expr.match(/^SUM\((.+)\)$/i);
+    if (sumMatch) return this.evalSUM(sumMatch[1]);
+
+    // AVERAGE
+    const avgMatch = expr.match(/^AVERAGE\((.+)\)$/i);
+    if (avgMatch) return this.evalAVERAGE(avgMatch[1]);
+
+    // COUNT
+    const cntMatch = expr.match(/^COUNT\((.+)\)$/i);
+    if (cntMatch) return this.evalCOUNT(cntMatch[1]);
+
+    // MAX / MIN
+    const maxMatch = expr.match(/^MAX\((.+)\)$/i);
+    if (maxMatch) return this.evalMAX(maxMatch[1]);
+    const minMatch = expr.match(/^MIN\((.+)\)$/i);
+    if (minMatch) return this.evalMIN(minMatch[1]);
+
+    // Simple arithmetic: =A1+B1 or =A1*2
+    try {
+      const resolved = expr.replace(/[A-Z]+\d+/gi, (m) => {
+        const c = this.getCell(m.toUpperCase());
+        const v = parseFloat(c.display);
+        return isNaN(v) ? 0 : v;
+      });
+      const result = new Function('return ' + resolved)();
+      if (typeof result === 'number') return result;
+    } catch (e) { /* fall through */ }
+
+    return '#ERROR';
+  }
+
+  _collectValues(argStr) {
+    const values = [];
+    const parts = argStr.split(',').map(s => s.trim());
+    for (const part of parts) {
+      const range = parseRange(part);
+      if (range) {
+        for (let r = range.rowStart; r <= range.rowEnd; r++) {
+          for (let c = range.colStart; c <= range.colEnd; c++) {
+            const cell = this.getCell(cellRef(c, r));
+            const v = parseFloat(cell.display);
+            if (!isNaN(v)) values.push(v);
+          }
+        }
+      } else {
+        const ref = parseCellRef(part);
+        if (ref) {
+          const cell = this.getCell(cellRef(ref.col, ref.row));
+          const v = parseFloat(cell.display);
+          if (!isNaN(v)) values.push(v);
+        }
+      }
+    }
+    return values;
+  }
+
+  evalSUM(argStr) {
+    const vals = this._collectValues(argStr);
+    return vals.reduce((a, b) => a + b, 0);
+  }
+  evalAVERAGE(argStr) {
+    const vals = this._collectValues(argStr);
+    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  }
+  evalCOUNT(argStr) { return this._collectValues(argStr).length; }
+  evalMAX(argStr) {
+    const vals = this._collectValues(argStr);
+    return vals.length > 0 ? Math.max(...vals) : 0;
+  }
+  evalMIN(argStr) {
+    const vals = this._collectValues(argStr);
+    return vals.length > 0 ? Math.min(...vals) : 0;
+  }
+
+  recalcDependents(changedRef) {
+    // Re-evaluate all formula cells that might reference changedRef
+    for (const [ref, cell] of Object.entries(this.cells)) {
+      if (cell.formula && cell.formula.toUpperCase().includes(changedRef.toUpperCase())) {
+        cell.display = this.evaluateFormula(cell.formula, ref);
+      }
+    }
+  }
+
+  // ---- Cell formatting ----
+  formatCell(type) {
+    const cell = this.getCell(this.activeCell);
+    cell.fmt = cell.fmt === type ? null : type;
+    this.dirty = true;
+    this.render();
+  }
+
+  formattedDisplay(cell) {
+    const v = cell.display;
+    if (cell.fmt === 'currency' && !isNaN(parseFloat(v))) return formatCurrency(parseFloat(v));
+    if (cell.fmt === 'percent' && !isNaN(parseFloat(v))) {
+      const pct = (parseFloat(v) * 100);
+      return pct.toFixed(1) + '%';
+    }
+    if (cell.fmt === 'number' && !isNaN(parseFloat(v))) return parseFloat(v).toLocaleString();
+    if (cell.fmt === 'bold') return v;
+    return v;
+  }
+
+  // ---- Clipboard ----
+  copy() { this.clipboard = this.getCell(this.activeCell).raw; this.clipboardMode = 'copy'; }
+  cut() { this.clipboard = this.getCell(this.activeCell).raw; this.clipboardMode = 'cut'; }
+  paste() {
+    if (this.clipboard === null) return;
+    if (this.clipboardMode === 'cut') {
+      const old = this.getCell(this.activeCell).raw;
+      this.setCellRaw(this.activeCell, '');
+      this.clipboard = old;
+    }
+    this.setCellRaw(this.activeCell, this.clipboard);
+    this.clipboardMode = null;
+    this.render();
+  }
+
+  // ---- Row/col ops ----
+  insertRow() {
+    const ref = parseCellRef(this.activeCell);
+    if (!ref) return;
+    // Shift all cells below down
+    const newCells = {};
+    for (const [key, cell] of Object.entries(this.cells)) {
+      const pr = parseCellRef(key);
+      if (!pr) { newCells[key] = cell; continue; }
+      if (pr.row >= ref.row) {
+        newCells[cellRef(pr.col, pr.row + 1)] = cell;
+      } else {
+        newCells[key] = cell;
+      }
+    }
+    this.cells = newCells;
+    this.numRows++;
+    this.dirty = true;
+    this.render();
+  }
+
+  deleteRow() {
+    const ref = parseCellRef(this.activeCell);
+    if (!ref) return;
+    const newCells = {};
+    for (const [key, cell] of Object.entries(this.cells)) {
+      const pr = parseCellRef(key);
+      if (!pr) { newCells[key] = cell; continue; }
+      if (pr.row > ref.row) {
+        newCells[cellRef(pr.col, pr.row - 1)] = cell;
+      } else if (pr.row < ref.row) {
+        newCells[key] = cell;
+      }
+      // row == ref.row → delete
+    }
+    this.cells = newCells;
+    this.numRows = Math.max(10, this.numRows - 1);
+    this.dirty = true;
+    this.render();
+  }
+
+  insertCol() {
+    const ref = parseCellRef(this.activeCell);
+    if (!ref) return;
+    const newCells = {};
+    for (const [key, cell] of Object.entries(this.cells)) {
+      const pr = parseCellRef(key);
+      if (!pr) { newCells[key] = cell; continue; }
+      if (pr.col >= ref.col) {
+        newCells[cellRef(pr.col + 1, pr.row)] = cell;
+      } else {
+        newCells[key] = cell;
+      }
+    }
+    this.cells = newCells;
+    this.numCols = Math.min(MAX_COLS, this.numCols + 1);
+    this.dirty = true;
+    this.render();
+  }
+
+  // ---- Save/New ----
+  save() {
+    this.dirty = false;
+    const indicator = document.getElementById('excelSaveIndicator');
+    if (indicator) { indicator.textContent = '● 已保存 ' + new Date().toLocaleTimeString(); }
+    showToast('💾 电子表格已保存');
+  }
+
+  newSheet() {
+    if (this.dirty && !confirm('当前表格有未保存的更改，确定新建吗？')) return;
+    this.cells = {};
+    this.undoStack = [];
+    this.redoStack = [];
+    this.activeCell = 'A1';
+    this.dirty = false;
+    this.numRows = 50;
+    this.numCols = 12;
+    this.loadedFileName = null;
+    this.render();
+  }
+
+  addSheet() {
+    this.newSheet();
+  }
+
+  // ---- Selection ----
+  selectCell(ref) {
+    this.activeCell = ref;
+    this.selectionStart = ref;
+    this.selectionEnd = ref;
+    this.updateFormulaBar();
+    this.updateStatusBar();
+    this.render();
+  }
+
+  selectRange(startRef, endRef) {
+    this.selectionStart = startRef;
+    this.selectionEnd = endRef;
+    this.activeCell = startRef;
+    this.updateFormulaBar();
+    this.updateStatusBar();
+    this.render();
+  }
+
+  updateFormulaBar() {
+    const nb = document.getElementById('excelNameBox');
+    const fi = document.getElementById('excelFormulaInput');
+    if (nb) nb.textContent = this.activeCell;
+    if (fi) {
+      const cell = this.getCell(this.activeCell);
+      fi.value = cell.formula || (cell.raw !== undefined ? cell.raw : '');
+    }
+  }
+
+  updateStatusBar() {
+    const el = document.getElementById('excelStatusSum');
+    if (!el) return;
+    const range = this.getSelectionRange();
+    const vals = this._collectValues(this._rangeToStr(range));
+    if (vals.length === 0) {
+      el.textContent = '求和: — | 平均值: — | 计数: 0';
+      return;
+    }
+    const sum = vals.reduce((a, b) => a + b, 0);
+    const avg = sum / vals.length;
+    el.textContent = `求和: ${formatCurrency(sum)} | 平均值: ${formatCurrency(avg)} | 计数: ${vals.length}`;
+  }
+
+  getSelectionRange() {
+    const s = parseCellRef(this.selectionStart), e = parseCellRef(this.selectionEnd);
+    return {
+      colStart: Math.min(s.col, e.col), colEnd: Math.max(s.col, e.col),
+      rowStart: Math.min(s.row, e.row), rowEnd: Math.max(s.row, e.row),
+    };
+  }
+
+  _rangeToStr(r) {
+    return cellRef(r.colStart, r.rowStart) + ':' + cellRef(r.colEnd, r.rowEnd);
+  }
+
+  isInSelection(col, row) {
+    const r = this.getSelectionRange();
+    return col >= r.colStart && col <= r.colEnd && row >= r.rowStart && row <= r.rowEnd;
+  }
+
+  isActive(col, row) {
+    return cellRef(col, row) === this.activeCell;
+  }
+
+  // ---- Render ----
+  recalcAll() {
+    // Two passes for dependency chains (A→B→C)
+    for (let pass = 0; pass < 2; pass++) {
+      for (const [ref, cell] of Object.entries(this.cells)) {
+        if (cell.formula) {
+          cell.display = this.evaluateFormula(cell.formula, ref);
+        }
+      }
+    }
+  }
+
+  render() {
+    this.recalcAll();
+    this._renderGrid();
+  }
+
+  _renderGrid() {
+    const head = document.getElementById('excelGridHead');
+    const body = document.getElementById('excelGridBody');
+    if (!head || !body) return;
+
+    // Column headers
+    let headHTML = '<tr><th class="row-header" style="width:40px"></th>';
+    for (let c = 1; c <= this.numCols; c++) {
+      const sel = this._isColSelected(c) ? ' selected' : '';
+      headHTML += `<th class="col-header${sel}" data-col="${c}">${colToLetter(c)}</th>`;
+    }
+    headHTML += '</tr>';
+    head.innerHTML = headHTML;
+
+    // Rows
+    let bodyHTML = '';
+    for (let r = 1; r <= this.numRows; r++) {
+      const rowSel = this._isRowSelected(r) ? ' selected' : '';
+      bodyHTML += `<tr><td class="row-header${rowSel}" data-row="${r}">${r}</td>`;
+      for (let c = 1; c <= this.numCols; c++) {
+        const ref = cellRef(c, r);
+        const cell = this.cells[ref];
+        const val = cell ? cell.display : '';
+        const display = cell ? this.formattedDisplay(cell) : '';
+        const inSel = this.isInSelection(c, r) ? ' in-selection' : '';
+        const active = this.isActive(c, r) ? ' active-cell' : '';
+        const classes = this._cellClasses(cell, inSel, active);
+        const cellDisplay = (cell && cell.formula) ? this.formattedDisplay(cell) : (display || '');
+        bodyHTML += `<td class="cell${classes}" data-ref="${ref}"
+                        data-col="${c}" data-row="${r}"
+                        title="${ref}: ${val}">${cellDisplay}</td>`;
+      }
+      bodyHTML += '</tr>';
+    }
+    body.innerHTML = bodyHTML;
+
+    // Re-bind events
+    this._bindGridEvents();
+  }
+
+  _cellClasses(cell, inSel, active) {
+    let cls = inSel + active;
+    if (!cell || !cell.fmt) return cls;
+    if (cell.fmt === 'currency') cls += ' currency';
+    else if (cell.fmt === 'percent') cls += ' percent';
+    else if (cell.fmt === 'number') cls += ' number';
+    else if (cell.fmt === 'bold') cls += ' bold';
+    return cls;
+  }
+
+  _isColSelected(c) {
+    const r = this.getSelectionRange();
+    return c >= r.colStart && c <= r.colEnd && r.rowStart === 1 && r.rowEnd === this.numRows;
+  }
+
+  _isRowSelected(r) {
+    const sel = this.getSelectionRange();
+    return r >= sel.rowStart && r <= sel.rowEnd && sel.colStart === 1 && sel.colEnd === this.numCols;
+  }
+
+  _bindGridEvents() {
+    const body = document.getElementById('excelGridBody');
+    const head = document.getElementById('excelGridHead');
+    const wrap = document.getElementById('excelGridWrap');
+    if (!body) return;
+
+    // Cell click → select
+    body.querySelectorAll('td.cell').forEach(td => {
+      td.addEventListener('mousedown', (e) => {
+        const ref = td.dataset.ref;
+        if (!ref) return;
+        if (e.shiftKey) {
+          this.selectRange(this.selectionStart, ref);
+        } else {
+          this.selectCell(ref);
+        }
+      });
+    });
+
+    // Double-click → edit
+    body.querySelectorAll('td.cell').forEach(td => {
+      td.addEventListener('dblclick', (e) => {
+        const ref = td.dataset.ref;
+        if (!ref) return;
+        this.selectCell(ref);
+        this._startCellEdit(td, ref);
+      });
+    });
+
+    // Column header click → select column
+    if (head) {
+      head.querySelectorAll('.col-header').forEach(th => {
+        th.addEventListener('click', () => {
+          const col = parseInt(th.dataset.col);
+          this.selectRange(cellRef(col, 1), cellRef(col, this.numRows));
+        });
+      });
+    }
+
+    // Row header click → select row
+    body.querySelectorAll('.row-header').forEach(th => {
+      th.addEventListener('click', () => {
+        const row = parseInt(th.dataset.row);
+        this.selectRange(cellRef(1, row), cellRef(this.numCols, row));
+      });
+    });
+  }
+
+  _startCellEdit(td, ref) {
+    const cell = this.getCell(ref);
+    const rect = td.getBoundingClientRect();
+    const wrap = document.getElementById('excelGridWrap');
+    const wrapRect = wrap.getBoundingClientRect();
+
+    // Remove existing editor
+    const existing = document.querySelector('.cell-editing');
+    if (existing) existing.remove();
+
+    const input = document.createElement('input');
+    input.className = 'cell-editing';
+    input.value = cell.formula || cell.raw || '';
+    input.style.left = (rect.left - wrapRect.left + wrap.scrollLeft) + 'px';
+    input.style.top = (rect.top - wrapRect.top + wrap.scrollTop) + 'px';
+    input.style.width = Math.max(rect.width, 70) + 'px';
+    input.style.height = rect.height + 'px';
+    wrap.appendChild(input);
+    input.focus();
+    input.select();
+
+    const commit = () => {
+      const val = input.value;
+      if (val !== (cell.formula || cell.raw || '')) {
+        this.setCellRaw(ref, val);
+        this.updateFormulaBar();
+        this.render();
+      }
+      input.remove();
+      // Refocus
+      const fi = document.getElementById('excelFormulaInput');
+      if (fi) fi.focus();
+    };
+
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      else if (e.key === 'Tab') { e.preventDefault(); commit(); this._moveSelection(0, 1); }
+      else if (e.key === 'Escape') { e.preventDefault(); input.value = cell.raw || ''; commit(); }
+    });
+  }
+
+  _moveSelection(dRow, dCol) {
+    const ref = parseCellRef(this.activeCell);
+    if (!ref) return;
+    const newCol = Math.max(1, Math.min(this.numCols, ref.col + dCol));
+    const newRow = Math.max(1, Math.min(this.numRows, ref.row + dRow));
+    this.selectCell(cellRef(newCol, newRow));
+  }
+
+  // ---- Load from file data ----
+  loadFromArray(data, fileName) {
+    // data: 2D array [[row1], [row2], ...]
+    this.cells = {};
+    this.undoStack = [];
+    this.redoStack = [];
+    this.numRows = Math.max(data.length, 50);
+    this.numCols = Math.max(data.reduce((m, r) => Math.max(m, r.length), 0), 12);
+    this.numCols = Math.min(this.numCols, MAX_COLS);
+
+    for (let r = 0; r < data.length; r++) {
+      for (let c = 0; c < (data[r] ? data[r].length : 0); c++) {
+        const ref = cellRef(c + 1, r + 1);
+        const val = data[r][c];
+        const raw = (val !== undefined && val !== null) ? String(val) : '';
+        this.setCellRaw(ref, raw);
+      }
+    }
+    // Auto-format: detect currency/number columns
+    this._autoDetectFormats(data);
+
+    this.loadedFileName = fileName;
+    this.dirty = false;
+    this.activeCell = 'A1';
+    this.selectionStart = 'A1';
+    this.selectionEnd = 'A1';
+
+    // Update title
+    const title = document.getElementById('excelTitleText');
+    if (title) title.textContent = (fileName || '季度销售报表') + ' - Excel';
+    const indicator = document.getElementById('excelSaveIndicator');
+    if (indicator) indicator.textContent = '● 已保存';
+
+    this.render();
+  }
+
+  _autoDetectFormats(data) {
+    for (let c = 1; c <= this.numCols; c++) {
+      let numCount = 0, currencyCount = 0, total = 0;
+      for (let r = 1; r <= Math.min(data.length, 20); r++) {
+        const ref = cellRef(c, r);
+        const cell = this.cells[ref];
+        if (!cell || !cell.display) continue;
+        const v = cell.display.toString().trim();
+        total++;
+        if (/^[¥$]/.test(v)) currencyCount++;
+        else if (!isNaN(parseFloat(v)) && isNaN(Date.parse(v))) numCount++;
+      }
+      if (total === 0) continue;
+      if (currencyCount / total > 0.3) {
+        for (let r = 1; r <= this.numRows; r++) {
+          const ref = cellRef(c, r);
+          if (this.cells[ref] && !isNaN(parseFloat(this.cells[ref].display))) {
+            this.cells[ref].fmt = 'currency';
+          }
+        }
+      } else if (numCount / total > 0.6) {
+        for (let r = 1; r <= this.numRows; r++) {
+          const ref = cellRef(c, r);
+          if (this.cells[ref] && !isNaN(parseFloat(this.cells[ref].display))) {
+            this.cells[ref].fmt = 'number';
+          }
+        }
+      }
+    }
+  }
+
+  // ---- Default data ----
+  loadDefaultData() {
+    const data = [
+      ['2025 年 第 一 季 度 销 售 报 表', '', '', '', '', '', '', '', '', ''],
+      ['制表人：张承瑞 | 部门：技术部 | 日期：2025-03-31 | 单位：元', '', '', '', '', '', '', '', '', ''],
+      ['序号', '日期', '产品名称', '销售数量', '单价（元）', '销售额（元）', '成本（元）', '利润（元）', '利润率', '备注'],
+      ['1', '2025-01-05', '智能扭矩扳手 TQ-200', '156', '¥ 3,280.00', '=D4*3280', '=F4*0.7', '=F4-G4', '30.0%', '正常'],
+      ['2', '2025-01-12', '电动螺丝刀 ED-150', '243', '¥ 1,860.00', '=D5*1860', '=F5*0.65', '=F5-G5', '35.0%', '大客户订单'],
+      ['3', '2025-01-20', '扭矩校准仪 TC-50', '89', '¥ 5,680.00', '=D6*5680', '=F6*0.7', '=F6-G6', '30.0%', '正常'],
+      ['4', '2025-02-03', '智能扭矩扳手 TQ-200', '178', '¥ 3,280.00', '=D7*3280', '=F7*0.7', '=F7-G7', '30.0%', '正常'],
+      ['5', '2025-02-14', '电动螺丝刀 ED-150', '312', '¥ 1,860.00', '=D8*1860', '=F8*0.65', '=F8-G8', '35.0%', '促销活动'],
+      ['6', '2025-02-21', '扭矩校准仪 TC-50', '102', '¥ 5,680.00', '=D9*5680', '=F9*0.7', '=F9-G9', '30.0%', '正常'],
+      ['7', '2025-03-07', '无刷电机模组 BM-300', '67', '¥ 8,200.00', '=D10*8200', '=F10*0.7', '=F10-G10', '30.0%', '新品上市'],
+      ['8', '2025-03-15', '智能扭矩扳手 TQ-200', '201', '¥ 3,280.00', '=D11*3280', '=F11*0.7', '=F11-G11', '30.0%', '季度末冲量'],
+      ['9', '2025-03-18', '电动螺丝刀 ED-150', '289', '¥ 1,860.00', '=D12*1860', '=F12*0.65', '=F12-G12', '35.0%', '经销商采购'],
+      ['10', '2025-03-25', '无刷电机模组 BM-300', '85', '¥ 8,200.00', '=D13*8200', '=F13*0.7', '=F13-G13', '30.0%', '正常'],
+      ['11', '2025-03-28', '扭矩校准仪 TC-50', '94', '¥ 5,680.00', '=D14*5680', '=F14*0.7', '=F14-G14', '30.0%', '正常'],
+      ['12', '2025-03-31', '智能扭矩扳手 TQ-200', '224', '¥ 3,280.00', '=D15*3280', '=F15*0.7', '=F15-G15', '30.0%', '季度末冲量'],
+      ['', '', '合计', '=SUM(D4:D15)', '', '=SUM(F4:F15)', '=SUM(G4:G15)', '=SUM(H4:H15)', '', ''],
+      ['', '', '', '', '', '', '', '', '', ''],
+      ['备注：① 电动螺丝刀 ED-150 在 2 月促销期间销量增长明显，建议 Q2 继续保持促销力度。② 无刷电机模组 BM-300 为新品，市场反馈良好。③ 数据已同步至 ERP 系统。', '', '', '', '', '', '', '', '', ''],
+      ['', '', '', '', '', '', '', '', '', ''],
+      ['报表生成时间：' + new Date().toLocaleString() + ' | 数据来源：ERP v3.2 | 自动生成 · 请勿手动修改', '', '', '', '', '', '', '', '', ''],
+    ];
+    this.loadFromArray(data, '季度销售报表.xlsx');
+  }
+}
+
+// ---- 全局电子表格实例 ----
+let ssEngine = null;
+
+// ---- 老板来了 ----
+function activatePanic() {
+  if (panicActive) return;
+  panicActive = true;
+  characterMood = 'panic';
+  if (timerRunning && !timerPaused) { pauseTimer(); }
+
+  // 确保 ssEngine 已初始化
+  if (!ssEngine) {
+    ssEngine = new SpreadsheetEngine();
+    ssEngine.loadDefaultData();
+  }
+  ssEngine.render();
+  ssEngine.updateFormulaBar();
+  ssEngine.updateStatusBar();
+
+  // 绑定公式栏事件（DOM 已就绪，此处直接绑定）
+  _bindFormulaBar();
+
+  $panicOverlay.style.display = 'flex';
+
+  // 不自动聚焦公式栏，让 ESC 能直接退出
+  // 用户点击单元格或按任意键即可开始编辑
+}
+
+function deactivatePanic() {
+  panicActive = false;
+  $panicOverlay.style.display = 'none';
+  characterMood = timerRunning && !timerPaused ? 'slacking' : 'idle';
+  if (timerPaused && timerSeconds > 0) { startTimer(); }
+}
+
+// ---- Excel 全局键盘快捷方式 ----
+document.addEventListener('keydown', function(e) {
+  if (!panicActive) return; // 只在 Excel 模式下生效
+
+  const fi = document.getElementById('excelFormulaInput');
+  const ed = document.querySelector('.cell-editing');
+  if (ed) return; // 正在编辑单元格时不拦截
+
+  // stopImmediatePropagation：阻止原"摸鱼快捷键 handler"触发，
+  // 否则 ESC 先被此处 deactivatePanic() 关掉，又被原 handler 的
+  // case 'escape' 重新 activatePanic() 打开，造成关不掉的假象。
+  e.stopImmediatePropagation();
+
+  const ctrl = e.ctrlKey || e.metaKey;
+
+  // Ctrl+S 保存
+  if (ctrl && e.key.toLowerCase() === 's') { e.preventDefault(); ssEngine.save(); return; }
+  // Ctrl+Z 撤消
+  if (ctrl && e.key.toLowerCase() === 'z') { e.preventDefault(); ssEngine.undo(); return; }
+  // Ctrl+Y 恢复
+  if (ctrl && e.key.toLowerCase() === 'y') { e.preventDefault(); ssEngine.redo(); return; }
+  // Ctrl+C 复制
+  if (ctrl && e.key.toLowerCase() === 'c') { e.preventDefault(); ssEngine.copy(); return; }
+  // Ctrl+V 粘贴
+  if (ctrl && e.key.toLowerCase() === 'v') { e.preventDefault(); ssEngine.paste(); return; }
+  // Ctrl+X 剪切
+  if (ctrl && e.key.toLowerCase() === 'x') { e.preventDefault(); ssEngine.cut(); return; }
+  // Ctrl+B 加粗
+  if (ctrl && e.key.toLowerCase() === 'b') { e.preventDefault(); ssEngine.formatCell('bold'); return; }
+  // Ctrl+I 倾斜
+  if (ctrl && e.key.toLowerCase() === 'i') { e.preventDefault(); ssEngine.formatCell('italic'); return; }
+
+  switch (e.key) {
+    case 'ArrowUp':    e.preventDefault(); ssEngine._moveSelection(-1, 0); break;
+    case 'ArrowDown':  e.preventDefault(); ssEngine._moveSelection(1, 0);  break;
+    case 'ArrowLeft':  e.preventDefault(); ssEngine._moveSelection(0, -1); break;
+    case 'ArrowRight': e.preventDefault(); ssEngine._moveSelection(0, 1);  break;
+    case 'Tab':
+      e.preventDefault();
+      ssEngine._moveSelection(0, e.shiftKey ? -1 : 1);
+      break;
+    case 'Enter':
+      e.preventDefault();
+      ssEngine._moveSelection(1, 0);
+      break;
+    case 'F2':
+      e.preventDefault();
+      {
+        const ref = ssEngine.activeCell;
+        const td = document.querySelector(`td.cell[data-ref="${ref}"]`);
+        if (td) ssEngine._startCellEdit(td, ref);
+      }
+      break;
+    case 'Delete':
+      e.preventDefault();
+      ssEngine.setCellRaw(ssEngine.activeCell, '');
+      ssEngine.render();
+      break;
+    case 'Escape':
+      if (!panicActive) break;
+      deactivatePanic();
+      break;
+    default:
+      // 任何可打印字符 → 开始编辑当前单元格
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey
+          && document.activeElement !== fi) {
+        e.preventDefault();
+        const ref = ssEngine.activeCell;
+        ssEngine.setCellRaw(ref, e.key);
+        ssEngine.updateFormulaBar();
+        ssEngine.render();
+        // 将光标移到公式栏
+        if (fi) { fi.value = e.key; fi.focus(); fi.setSelectionRange(1, 1); }
+      }
+  }
+});
+
+// ---- 编辑栏事件（在 Excel 窗口显示时绑定，不用 DOMContentLoaded）----
+function _bindFormulaBar() {
+  const fi = document.getElementById('excelFormulaInput');
+  if (!fi || fi._bound) return;
+  fi._bound = true;
+
+  fi.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (ssEngine) {
+        ssEngine.setCellRaw(ssEngine.activeCell, fi.value);
+        ssEngine.render();
+      }
+      fi.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();  // 阻止冒泡到 document → 不会退出 panic
+      if (ssEngine) {
+        const cell = ssEngine.getCell(ssEngine.activeCell);
+        fi.value = cell.formula || cell.raw || '';
+      }
+      fi.blur();
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (ssEngine) {
+        ssEngine.setCellRaw(ssEngine.activeCell, fi.value);
+        ssEngine._moveSelection(0, 1);
+        ssEngine.render();
+        fi.value = ssEngine.getCell(ssEngine.activeCell).formula || ssEngine.getCell(ssEngine.activeCell).raw || '';
+      }
+    }
+  });
+
+  fi.addEventListener('input', function() {
+    if (ssEngine && fi.value.startsWith('=')) {
+      const result = ssEngine.evaluateFormula(fi.value, ssEngine.activeCell);
+      const sb = document.getElementById('excelStatusSum');
+      if (sb && result !== undefined && result !== '#ERROR') {
+        sb.textContent = '公式结果: ' + (typeof result === 'number' ? formatCurrency(result) : result);
+      }
+    }
+  });
+}
+
+// ---- 关闭 Excel 按钮 ----
+document.getElementById('btnExcelClose').addEventListener('click', deactivatePanic);
+
+// ---- 文件加载 ----
+const $excelFileInput = document.getElementById('excelFileInput');
+const $btnLoadExcel   = document.getElementById('btnLoadExcel');
+const $btnClearExcel  = document.getElementById('btnClearExcel');
+const $excelFileInd   = document.getElementById('excelFileIndicator');
+
+$btnLoadExcel.addEventListener('click', function() {
+  $excelFileInput.click();
+});
+
+$excelFileInput.addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if (ext === 'csv' || ext === 'txt') {
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      const text = ev.target.result;
+      const rows = text.split(/\r?\n/).filter(r => r.trim());
+      const data = rows.map(r => {
+        // Smart CSV parsing (handles quoted fields)
+        const result = [];
+        let current = '', inQuotes = false;
+        for (let i = 0; i < r.length; i++) {
+          const ch = r[i];
+          if (ch === '"') { inQuotes = !inQuotes; }
+          else if ((ch === ',' || ch === '\t') && !inQuotes) { result.push(current.trim()); current = ''; }
+          else { current += ch; }
+        }
+        result.push(current.trim());
+        return result;
+      });
+      _applyLoadedData(data, file.name);
+    };
+    reader.readAsText(file);
+  } else if (ext === 'xlsx' || ext === 'xls') {
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: 'array' });
+        const firstSheet = wb.SheetNames[0];
+        const ws = wb.Sheets[firstSheet];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        _applyLoadedData(data, file.name);
+      } catch (err) {
+        alert('❌ 无法解析 Excel 文件: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    alert('⚠️ 不支持的文件格式，请使用 .xlsx、.xls 或 .csv 文件');
+  }
+  // 清空 input 以允许重复加载同一文件
+  $excelFileInput.value = '';
+});
+
+function _applyLoadedData(data, fileName) {
+  if (!ssEngine) {
+    ssEngine = new SpreadsheetEngine();
+  }
+  ssEngine.loadFromArray(data, fileName);
+
+  // UI 更新
+  $btnLoadExcel.classList.add('loaded');
+  $btnLoadExcel.textContent = '📂 已加载: ' + (fileName.length > 18 ? fileName.substring(0, 15) + '...' : fileName);
+  $btnClearExcel.style.display = 'inline-block';
+  $excelFileInd.textContent = '✅ 已加载 ' + data.length + ' 行 × ' + (data[0] ? data[0].length : 0) + ' 列';
+
+  showToast('📂 Excel 文件已加载！按 ESC 测试老板模式');
+}
+
+$btnClearExcel.addEventListener('click', function() {
+  if (ssEngine) {
+    ssEngine.loadDefaultData();
+  }
+  $btnLoadExcel.classList.remove('loaded');
+  $btnLoadExcel.textContent = '📂 加载 Excel 文件';
+  $btnClearExcel.style.display = 'none';
+  $excelFileInd.textContent = '';
+  showToast('🗑 已恢复默认数据');
+});
+
+// ---- 成就系统 ----
+function checkAchievements() {
+  const newlyUnlocked = [];
+  for (const [key, ach] of Object.entries(ACHIEVEMENTS)) {
+    if (!data.achievements.includes(key) && ach.check(data)) {
+      data.achievements.push(key);
+      newlyUnlocked.push(ach);
+    }
+  }
+  if (newlyUnlocked.length > 0) {
+    newlyUnlocked.forEach(ach => {
+      showToast(`🏆 成就解锁: ${ach.name}`);
+    });
+    refreshAchievements();
+  }
+}
+
+function refreshAchievements() {
+  const cards = $achGrid.querySelectorAll('.ach-card');
+  cards.forEach(card => {
+    const achKey = card.dataset.ach;
+    if (data.achievements.includes(achKey)) {
+      card.classList.add('unlocked');
+    } else {
+      card.classList.remove('unlocked');
+    }
+  });
+}
+
+// ---- 扇形图绘制 ----
+
+const PIE_RES  = 64;   // 内部低分辨率网格
+const PIE_PX   = 4;    // 每个网格像素的实际像素大小 (64*4 = 256)
+const CX       = 32;   // 圆心 (grid 坐标)
+const CY       = 32;
+const OUTER_R  = 30;   // 外半径 (grid 坐标)
+const INNER_R  = 10;   // 内半径 (donut hole)
+
+// 每种活动的像素配色
+const ACTIVITY_COLORS = [
+  '#ff6b8a', // 刷手机 - 粉红
+  '#5b9cf5', // 聊天   - 蓝
+  '#ffd93d', // 喝咖啡 - 金
+  '#6bcb77', // 玩游戏 - 绿
+  '#ff9f43', // 看视频 - 橙
+  '#a78bfa', // 发呆   - 紫
+  '#f472b6', // 网购   - 玫红
+  '#34d399', // 看小说 - 青绿
+];
+
+function drawPieChart() {
+  const actSec = data.todayActivitySeconds || {};
+  // 收集有数据的活动
+  const entries = Object.entries(actSec).filter(([, sec]) => sec > 0);
+  const totalSec = entries.reduce((sum, [, sec]) => sum + sec, 0);
+
+  const canvasW = PIE_RES * PIE_PX;  // 256
+  $pieCanvas.width  = canvasW;
+  $pieCanvas.height = canvasW;
+
+  // 清空
+  pieCtx.fillStyle = '#2f3058';
+  pieCtx.fillRect(0, 0, canvasW, canvasW);
+
+  if (totalSec === 0 || entries.length === 0) {
+    // 空状态：灰色空心圆
+    for (let gy = 0; gy < PIE_RES; gy++) {
+      for (let gx = 0; gx < PIE_RES; gx++) {
+        const dx = gx - CX, dy = gy - CY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist >= INNER_R && dist <= OUTER_R) {
+          pieCtx.fillStyle = '#4a4580';
+          pieCtx.fillRect(gx * PIE_PX, gy * PIE_PX, PIE_PX, PIE_PX);
+        }
+      }
+    }
+    // 图例空状态
+    $chartLegend.innerHTML = `
+      <div class="chart-empty">
+        <span class="empty-big">🥧</span>
+        还没有摸鱼数据<br>开始计时后这里会显示分布图
+      </div>`;
+    $chartCenter.textContent = '—';
+    return;
+  }
+
+  // 按时长降序排列
+  entries.sort((a, b) => b[1] - a[1]);
+
+  // 为每项分配颜色
+  const assignedColors = {};
+  entries.forEach((e, i) => { assignedColors[e[0]] = ACTIVITY_COLORS[i % ACTIVITY_COLORS.length]; });
+
+  // 计算每项的起止角度 (弧度, 从 -PI/2 即 12 点钟方向开始)
+  const segments = [];
+  let angleStart = -Math.PI / 2;
+  for (const [activity, sec] of entries) {
+    const sweep = (sec / totalSec) * Math.PI * 2;
+    const angleEnd = angleStart + sweep;
+    segments.push({
+      activity,
+      seconds: sec,
+      startAngle: angleStart,
+      endAngle:   angleEnd,
+      percent:    (sec / totalSec) * 100,
+      color:      assignedColors[activity],
+    });
+    angleStart = angleEnd;
+  }
+
+  // 用网格逐像素判断角度归属 — 天然锯齿像素风
+  for (let gy = 0; gy < PIE_RES; gy++) {
+    for (let gx = 0; gx < PIE_RES; gx++) {
+      const dx = gx - CX;
+      const dy = gy - CY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      // 只在环形区域内绘制
+      if (dist < INNER_R || dist > OUTER_R) continue;
+
+      // 计算该像素的角度（atan2 返回 -PI..PI，y 轴向下所以取负）
+      let angle = Math.atan2(-dy, dx);
+
+      // 判断属于哪个 segment
+      for (const seg of segments) {
+        let aStart = seg.startAngle;
+        let aEnd   = seg.endAngle;
+        // 处理跨越 ±PI 边界
+        if (aEnd < aStart) aEnd += Math.PI * 2;
+        let a = angle;
+        if (a < aStart) a += Math.PI * 2;
+        if (a >= aStart && a < aEnd) {
+          pieCtx.fillStyle = seg.color;
+          pieCtx.fillRect(gx * PIE_PX, gy * PIE_PX, PIE_PX, PIE_PX);
+          break;
+        }
+      }
+    }
+  }
+
+  // 中心孔填充背景色，覆盖可能溢出的像素
+  for (let gy = 0; gy < PIE_RES; gy++) {
+    for (let gx = 0; gx < PIE_RES; gx++) {
+      const dx = gx - CX, dy = gy - CY;
+      if (Math.sqrt(dx*dx + dy*dy) < INNER_R - 0.5) {
+        pieCtx.fillStyle = '#252642';  // 面板色，融合背景
+        pieCtx.fillRect(gx * PIE_PX, gy * PIE_PX, PIE_PX, PIE_PX);
+      }
+    }
+  }
+
+  // 中心孔边框（像素圆环）
+  for (let gy = 0; gy < PIE_RES; gy++) {
+    for (let gx = 0; gx < PIE_RES; gx++) {
+      const dx = gx - CX, dy = gy - CY;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist >= INNER_R - 1.2 && dist <= INNER_R + 0.8) {
+        pieCtx.fillStyle = '#4a4580';
+        pieCtx.fillRect(gx * PIE_PX, gy * PIE_PX, PIE_PX, PIE_PX);
+      }
+    }
+  }
+
+  // 更新中心文字
+  $chartCenter.textContent = formatDuration(totalSec);
+
+  // 渲染图例
+  $chartLegend.innerHTML = segments.map(seg => `
+    <div class="chart-legend-item">
+      <div class="chart-legend-color" style="background:${seg.color}"></div>
+      <span class="chart-legend-name">${seg.activity}</span>
+      <span class="chart-legend-pct">${seg.percent.toFixed(1)}%</span>
+      <span class="chart-legend-time">${formatDuration(seg.seconds)}</span>
+    </div>
+  `).join('');
+}
+
+// ---- 刷新 UI ----
+function refreshUI() {
+  // 统计
+  $statSessions.textContent = data.todaySessions;
+  $statTotal.textContent = formatDuration(data.todayTotalSeconds);
+  $statLongest.textContent = formatDuration(data.todayLongestSession);
+
+  // 历史
+  if (data.history.length === 0) {
+    $historyList.innerHTML = '<div class="history-empty">还没有摸鱼记录哦~<br>快来开始你的第一次摸鱼吧！🐟</div>';
+  } else {
+    $historyList.innerHTML = data.history.map((h, i) => `
+      <div class="history-item">
+        <span>#${i+1}</span>
+        <span class="hi-activity">${h.activity}</span>
+        <span class="hi-time">${h.startTime||'--:--'}</span>
+        <span class="hi-duration">${formatDuration(h.duration)}</span>
+      </div>
+    `).join('');
+  }
+
+  // 成就
+  refreshAchievements();
+
+  // 扇形图
+  drawPieChart();
+}
+
+// ---- 活动选择（无需暂停，直接切换并自动结算）----
+$activityGrid.addEventListener('click', (e) => {
+  const btn = e.target.closest('.activity-btn');
+  if (!btn) return;
+  const newActivity = btn.dataset.activity;
+  if (newActivity === selectedActivity) return;
+
+  $activityGrid.querySelectorAll('.activity-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  switchActivity(newActivity);
+});
+
+// ---- 按钮事件 ----
+$btnStart.addEventListener('click', startTimer);
+$btnPause.addEventListener('click', pauseTimer);
+$btnStop.addEventListener('click', stopTimer);
+$btnReset.addEventListener('click', () => {
+  if (timerSeconds > 0 && !confirm('确定要重置计时器吗？当前计时将丢失！')) return;
+  resetTimer();
+});
+$btnPanic.addEventListener('click', activatePanic);
+$btnSafe.addEventListener('click', deactivatePanic);
+
+// ---- 键盘快捷键（仅非 Excel 模式）----
+document.addEventListener('keydown', (e) => {
+  // Excel 模式由 SpreadsheetEngine 键盘处理器接管，此处不处理
+  if (panicActive) return;
+  switch (e.key.toLowerCase()) {
+    case ' ':  // 空格
+      e.preventDefault();
+      if (timerRunning && !timerPaused) pauseTimer();
+      else startTimer();
+      break;
+    case 'escape':
+      activatePanic();
+      break;
+    case 's':
+      if (e.ctrlKey || e.metaKey) break; // 不拦截 Ctrl+S
+      if (timerRunning) stopTimer();
+      break;
+    case 'r':
+      if (e.ctrlKey || e.metaKey) break;
+      if (confirm('重置计时器？')) resetTimer();
+      break;
+  }
+});
+
+// ==================== 像素角色绘制 ====================
+
+// 颜色调色板
+const PALETTE = {
+  wall:       '#e8d5b7',
+  wallShadow: '#d4c0a0',
+  window:     '#87ceeb',
+  windowFrame:'#8b7355',
+  desk:      '#8b5e3c',
+  deskTop:   '#a0724a',
+  deskLight: '#b8845c',
+  monitor:   '#3a3a4a',
+  monitorScreen: '#e0f0ff',
+  monitorStand:'#555',
+  skin:      '#ffcc99',
+  skinShadow:'#e6b380',
+  hair:      '#3d2b1f',
+  shirt:     '#5599cc',
+  shirtDark: '#3d7aaa',
+  coffee:    '#6f4e37',
+  coffeeCup: '#f5f5f0',
+  keyboard:  '#666',
+  paper:     '#fafaf5',
+  plant:     '#5a9e4b',
+  plantPot:  '#c47040',
+  clock:     '#f0e6d8',
+  poster:    '#ffe0b2',
+};
+
+// 在低分辨率下绘制，然后放大
+const PX = 4; // 像素块大小（实际绘制分辨率）
+const W = 320 / PX;  // 80 个像素块宽
+const H = 200 / PX;  // 50 个像素块高
+
+function pset(x, y, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x * PX, y * PX, PX, PX);
+}
+
+function prect(x, y, w, h, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x * PX, y * PX, w * PX, h * PX);
+}
+
+function drawCharacterScene(mood, frame) {
+  // 清空
+  ctx.fillStyle = '#2a2740';
+  ctx.fillRect(0, 0, 320, 200);
+
+  const bob = mood === 'slacking' ? Math.sin(frame * 0.08) * 1.5 : 0;
+  const panicShake = mood === 'panic' ? (Math.random() - 0.5) * 3 : 0;
+  const sx = Math.round(panicShake);
+  const sy = Math.round(bob + panicShake);
+
+  // ---- 背景墙 ----
+  prect(0, 0, W, H, PALETTE.wall);
+  // 墙壁纹路（竖线条）
+  for (let x = 0; x < W; x += 10) {
+    prect(x, 0, 1, H, PALETTE.wallShadow);
+  }
+
+  // ---- 窗户 ----
+  const winX = 56, winY = 3, winW = 14, winH = 16;
+  prect(winX + sx, winY + sy, winW, winH, PALETTE.window);
+  // 窗框十字
+  prect(winX + sx, winY + sy + Math.floor(winH/2), winW, 1, PALETTE.windowFrame);
+  prect(winX + sx + Math.floor(winW/2), winY + sy, 1, winH, PALETTE.windowFrame);
+  // 窗框边框
+  prect(winX-1 + sx, winY-1 + sy, winW+2, 1, PALETTE.windowFrame);
+  prect(winX-1 + sx, winY+winH + sy, winW+2, 1, PALETTE.windowFrame);
+  prect(winX-1 + sx, winY + sy, 1, winH, PALETTE.windowFrame);
+  prect(winX+winW + sx, winY + sy, 1, winH, PALETTE.windowFrame);
+  // 天空中的云/太阳
+  prect(winX+2 + sx, winY+3 + sy, 3, 2, '#fff');
+  prect(winX+3 + sx, winY+2 + sy, 4, 1, '#fff');
+  prect(winX+9 + sx, winY+2 + sy, 2, 2, '#ffdb4d');
+
+  // ---- 海报/挂画 ----
+  prect(10 + sx, 6 + sy, 8, 10, PALETTE.poster);
+  prect(10 + sx, 6 + sy, 8, 1, '#d4a574');
+  prect(10 + sx, 15 + sy, 8, 1, '#d4a574');
+  prect(10 + sx, 6 + sy, 1, 10, '#d4a574');
+  prect(17 + sx, 6 + sy, 1, 10, '#d4a574');
+  // 画上的内容（简单的山峰）
+  pset(14 + sx, 12 + sy, '#6b8e4e');
+  pset(13 + sx, 13 + sy, '#6b8e4e');
+  pset(14 + sx, 13 + sy, '#6b8e4e');
+  pset(15 + sx, 13 + sy, '#6b8e4e');
+
+  // ---- 时钟 ----
+  prect(W-14 + sx, 4 + sy, 6, 6, PALETTE.clock);
+  prect(W-14 + sx, 4 + sy, 6, 1, '#8b7355');
+  prect(W-14 + sx, 9 + sy, 6, 1, '#8b7355');
+  prect(W-14 + sx, 4 + sy, 1, 6, '#8b7355');
+  prect(W-9 + sx, 4 + sy, 1, 6, '#8b7355');
+  // 钟面指针
+  const clockCx = W - 11 + sx;
+  const clockCy = 7 + sy;
+  prect(clockCx, clockCy - 1, 1, 2, '#333'); // 时针
+  prect(clockCx, clockCy, 2, 1, '#c44');     // 分针
+
+  // ---- 桌面 ----
+  const deskY = 30;
+  prect(0, deskY + sy, W, 4, PALETTE.deskTop);
+  prect(0, deskY + 4 + sy, W, H - deskY - 4, PALETTE.desk);
+  // 桌面高光
+  prect(0, deskY + sy, W, 1, PALETTE.deskLight);
+
+  // ---- 电脑显示器 ----
+  const monX = 38, monY = 14, monW = 24, monH = 16;
+  // 显示器外壳
+  prect(monX + sx, monY + sy, monW, monH, PALETTE.monitor);
+  // 屏幕
+  const screenX = monX + 2, screenY = monY + 2, screenW = monW - 4, screenH = monH - 4;
+  prect(screenX + sx, screenY + sy, screenW, screenH, PALETTE.monitorScreen);
+  // 屏幕内容（根据状态变化）
+  if (mood === 'panic') {
+    // 显示 Excel 表格
+    prect(screenX + 2 + sx, screenY + 1 + sy, screenW - 4, screenH - 2, '#e8f0e8');
+    for (let r = 0; r < 4; r++) {
+      prect(screenX + 2 + sx, screenY + 2 + r*3 + sy, screenW - 4, 1, '#c0d0c0');
+    }
+    prect(screenX + 2 + sx, screenY + 2 + sy, screenW/2 - 2, 1, '#c0d0c0');
+  } else if (mood === 'slacking') {
+    // 显示摸鱼内容（视频/游戏）
+    const flicker = Math.sin(frame * 0.2) > 0 ? 1 : 0;
+    prect(screenX + 2 + sx, screenY + 1 + sy, screenW - 4, Math.floor(screenH/2) + flicker, '#ff9999');
+    prect(screenX + 2 + sx, screenY + Math.floor(screenH/2) + 1 + flicker + sy, screenW - 4, Math.floor(screenH/2) - 1 - flicker, '#99ccff');
+  } else {
+    // 显示普通桌面
+    prect(screenX + 2 + sx, screenY + 1 + sy, screenW - 4, Math.floor(screenH/2), '#c8d8f0');
+    prect(screenX + 2 + sx, screenY + Math.floor(screenH/2) + 1 + sy, screenW - 4, Math.floor(screenH/2)-1, '#f0f0e0');
+  }
+  // 显示器支架
+  prect(monX + Math.floor(monW/2) - 2 + sx, monY + monH + sy, 4, 3, PALETTE.monitorStand);
+  prect(monX + Math.floor(monW/2) - 4 + sx, monY + monH + 3 + sy, 8, 1, PALETTE.monitorStand);
+
+  // ---- 人物（坐在桌子后面）----
+  const personX = 20, personY = 10;
+  // 身体（衬衫）
+  prect(personX + 4 + sx, personY + 14 + sy, 12, 10, PALETTE.shirt);
+  // 衬衫领子
+  prect(personX + 8 + sx, personY + 14 + sy, 4, 2, PALETTE.shirtDark);
+  // 头部
+  const headX = personX + 5, headY = personY + 6;
+  prect(headX + sx, headY + sy, 10, 10, PALETTE.skin);
+  // 头发
+  prect(headX - 1 + sx, headY - 1 + sy, 12, 4, PALETTE.hair);
+  prect(headX - 1 + sx, headY + 3 + sy, 2, 2, PALETTE.hair);
+  prect(headX + 9 + sx, headY + 3 + sy, 2, 2, PALETTE.hair);
+  // 眼睛
+  const eyeY = headY + 3;
+  if (mood === 'panic') {
+    // 惊恐大眼
+    prect(headX + 2 + sx, eyeY + sy, 3, 3, '#fff');
+    prect(headX + 6 + sx, eyeY + sy, 3, 3, '#fff');
+    prect(headX + 3 + sx, eyeY + 1 + sy, 1, 1, '#000');
+    prect(headX + 7 + sx, eyeY + 1 + sy, 1, 1, '#000');
+    // 张嘴
+    prect(headX + 3 + sx, eyeY + 5 + sy, 5, 3, '#c44');
+    prect(headX + 4 + sx, eyeY + 5 + sy, 3, 3, '#e66');
+  } else if (mood === 'slacking') {
+    // 放松的眯眯眼 (闭眼)
+    prect(headX + 2 + sx, eyeY + 1 + sy, 3, 1, '#000');
+    prect(headX + 6 + sx, eyeY + 1 + sy, 3, 1, '#000');
+    // 微笑
+    prect(headX + 3 + sx, eyeY + 4 + sy, 5, 1, '#c44');
+  } else {
+    // 正常眼睛
+    prect(headX + 2 + sx, eyeY + sy, 3, 2, '#fff');
+    prect(headX + 6 + sx, eyeY + sy, 3, 2, '#fff');
+    const blink = (frame % 120 < 4) ? 0 : 1; // 偶尔眨眼
+    if (blink) {
+      prect(headX + 3 + sx, eyeY + 1 + sy, 1, 1, '#000');
+      prect(headX + 7 + sx, eyeY + 1 + sy, 1, 1, '#000');
+    }
+    // 嘴巴
+    prect(headX + 4 + sx, eyeY + 4 + sy, 3, 1, '#d4956b');
+  }
+
+  // ---- 手臂（放在桌上）----
+  if (mood === 'slacking') {
+    // 一只手在键盘，一只手拿手机/咖啡
+    prect(personX + 3 + sx, personY + 16 + sy, 5, 3, PALETTE.skin);
+    prect(personX + 14 + sx, personY + 16 + sy, 3, 3, PALETTE.skin);
+  } else {
+    prect(personX + 3 + sx, personY + 16 + sy, 4, 3, PALETTE.skin);
+    prect(personX + 13 + sx, personY + 16 + sy, 4, 3, PALETTE.skin);
+  }
+
+  // ---- 键盘 ----
+  prect(personX + 2 + sx, personY + 20 + sy, 16, 2, PALETTE.keyboard);
+  // 键盘按键纹理
+  for (let kx = 0; kx < 7; kx++) {
+    prect(personX + 3 + kx*2 + sx, personY + 20 + sy, 1, 1, '#888');
+  }
+
+  // ---- 咖啡杯 ----
+  const cupX = 3, cupY = 25;
+  prect(cupX + sx, cupY + sy, 5, 5, PALETTE.coffeeCup);
+  prect(cupX + 1 + sx, cupY + sy, 3, 1, PALETTE.coffee);
+  prect(cupX + sx, cupY - 1 + sy, 5, 1, PALETTE.coffeeCup); // 杯口
+  // 杯把
+  prect(cupX + 5 + sx, cupY + 1 + sy, 2, 2, PALETTE.coffeeCup);
+  prect(cupX + 6 + sx, cupY + 1 + sy, 1, 1, PALETTE.coffeeCup);
+  // 热气（动画）
+  const steamOff = Math.floor((frame % 30) / 10);
+  if (steamOff === 0) {
+    prect(cupX + 1 + sx, cupY - 3 + sy, 2, 1, 'rgba(255,255,255,0.5)');
+    prect(cupX + 2 + sx, cupY - 4 + sy, 1, 1, 'rgba(255,255,255,0.3)');
+  } else if (steamOff === 1) {
+    prect(cupX + 2 + sx, cupY - 3 + sy, 2, 1, 'rgba(255,255,255,0.4)');
+    prect(cupX + 1 + sx, cupY - 5 + sy, 1, 2, 'rgba(255,255,255,0.2)');
+  }
+
+  // ---- 绿植 ----
+  const plantX = W - 8;
+  prect(plantX + sx, deskY - 7 + sy, 6, 7, PALETTE.plant);
+  prect(plantX + 1 + sx, deskY - 8 + sy, 4, 2, PALETTE.plant);
+  prect(plantX + 2 + sx, deskY - 9 + sy, 2, 2, PALETTE.plant);
+  // 花盆
+  prect(plantX + 1 + sx, deskY - 1 + sy, 4, 2, PALETTE.plantPot);
+  prect(plantX + sx, deskY + sy, 6, 2, PALETTE.plantPot);
+
+  // ---- 桌面的纸/文件 ----
+  if (mood !== 'panic') {
+    prect(monX + monW + 4 + sx, deskY - 1 + sy, 8, 5, PALETTE.paper);
+    prect(monX + monW + 4 + sx, deskY - 1 + sy, 8, 1, '#e0e0d5');
+  }
+}
+
+// ---- 动画循环 ----
+function animate() {
+  animFrame++;
+  drawCharacterScene(characterMood, animFrame);
+  requestAnimationFrame(animate);
+}
+
+// ==================== 初始化 ====================
+function init() {
+  data = loadData();
+  saveData(); // 确保新字段被保存
+
+  // 如果今天还没活动且之前的最后活跃日期不是今天，重置今日数据
+  if (data.today !== getDateString()) {
+    const yesterday = getDateString(-1);
+    if (data.lastActiveDate === yesterday) {
+      data.consecutiveDays = (data.consecutiveDays || 1) + 1;
+    } else if (data.lastActiveDate !== getDateString()) {
+      data.consecutiveDays = 1;
+    }
+    data.today = getDateString();
+    data.todaySessions = 0;
+    data.todayTotalSeconds = 0;
+    data.todayLongestSession = 0;
+    data.history = [];
+    data.todayActivitySeconds = {};
+    data.lastActiveDate = getDateString();
+    saveData();
+  }
+
+  updateTimerDisplay();
+  refreshUI();
+  drawCharacterScene('idle', 0);
+  animate();
+
+  console.log('🐟 摸鱼计时器已就绪！');
+  console.log('  空格键 = 开始/暂停');
+  console.log('  S 键  = 结算');
+  console.log('  ESC   = 老板来了!!! (可编辑的 Excel 电子表格)');
+  console.log('  📂 支持加载 .xlsx / .xls / .csv 文件');
+  console.log('  累计摸鱼:', formatDuration(data.totalSecondsAllTime));
+  console.log('  成就:', data.achievements.length, '/', Object.keys(ACHIEVEMENTS).length);
+}
+
+init();
+</script>
+
+</body>
+</html>
